@@ -187,8 +187,25 @@ make
 </div>
 
 
-## Running Slicer
+## Run Slicer
 
 After the building process has successfully completed, the executable file to
 run slicer will be located in `./Slicer-build/Slicer`
 
+## Test Slicer
+
+After building, run the tests in the  `Slicer-SuperBuild/Slicer-build` directory.
+
+Start a terminal and type the following (you can replace 4 by the number of processor cores in the computer):
+```
+cd Slicer-SuperBuild-Debug/Slicer-build
+ctest -j4
+```
+
+## Package Slicer
+
+Start a terminal and type the following:
+```
+cd Slicer-SuperBuild-Debug/Slicer-build
+make package
+```
