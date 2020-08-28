@@ -36,7 +36,7 @@ if(NOT DEFINED ITK_DIR AND NOT Slicer_USE_SYSTEM_${proj})
 
   ExternalProject_SetIfNotDefined(
     Slicer_${proj}_GIT_TAG
-    "35704a458d1ad9a4a2f2634d38032216ab280823"  # v5.1rc03 with ITK PR#1727 fixing -Wstrict-overflow warning
+    "v5.1.1"
     QUIET
     )
 
@@ -45,7 +45,7 @@ if(NOT DEFINED ITK_DIR AND NOT Slicer_USE_SYSTEM_${proj})
   if(Slicer_USE_TBB)
     list(APPEND EXTERNAL_PROJECT_OPTIONAL_CMAKE_CACHE_ARGS
       -DModule_ITKTBB:BOOL=ON
-      -DTBB_DIR:PATH=${TBB_INSTALL_DIR}/cmake
+      -DTBB_DIR:PATH=${TBB_INSTALL_DIR}/tbb${tbb_ver}/cmake
       )
   endif()
 
@@ -93,6 +93,8 @@ if(NOT DEFINED ITK_DIR AND NOT Slicer_USE_SYSTEM_${proj})
     -DITK_LEGACY_REMOVE:BOOL=OFF   #<-- Allow LEGACY ITKv4 features for now.
     -DITK_LEGACY_SILENT:BOOL=ON    #<-- Silence for initial ITKv5 migration.
     -DModule_ITKDeprecated:BOOL=ON #<-- Needed for ITKv5 now. (itkMultiThreader.h and MutexLock backwards compatibility.)
+    -DModule_SimpleITKFilters:BOOL=${Slicer_USE_SimpleITK}
+    -DModule_SimpleITKFilters_GIT_TAG:STRING=ce51d77771a54e7e0791fadb15e50dc38cbd8358
     )
 
 
