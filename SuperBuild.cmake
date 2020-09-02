@@ -202,7 +202,7 @@ endmacro()
 
 Slicer_Remote_Add(vtkAddon
   GIT_REPOSITORY "${EP_GIT_PROTOCOL}://github.com/Slicer/vtkAddon"
-  GIT_TAG ab95838b7714a8e2fc8724a36197093393562e51
+  GIT_TAG 48a644d6b0ba4bb1bdb9721f9b361341f9051a95
   OPTION_NAME Slicer_BUILD_vtkAddon
   )
 list_conditional_append(Slicer_BUILD_vtkAddon Slicer_REMOTE_DEPENDENCIES vtkAddon)
