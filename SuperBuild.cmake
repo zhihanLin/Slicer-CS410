@@ -202,10 +202,13 @@ endmacro()
 
 Slicer_Remote_Add(vtkAddon
   GIT_REPOSITORY "${EP_GIT_PROTOCOL}://github.com/Slicer/vtkAddon"
-  GIT_TAG 48a644d6b0ba4bb1bdb9721f9b361341f9051a95
+  GIT_TAG a64d854cd826fb90b2aeb88907e948b3639f517f
   OPTION_NAME Slicer_BUILD_vtkAddon
   )
 list_conditional_append(Slicer_BUILD_vtkAddon Slicer_REMOTE_DEPENDENCIES vtkAddon)
+
+set(vtkAddon_CMAKE_DIR ${vtkAddon_SOURCE_DIR}/CMake)
+mark_as_superbuild(vtkAddon_CMAKE_DIR:PATH)
 
 set(vtkAddon_USE_UTF8 ON)
 mark_as_superbuild(vtkAddon_USE_UTF8:BOOL)
@@ -234,7 +237,7 @@ mark_as_advanced(Slicer_BUILD_MULTIVOLUME_SUPPORT)
 
 Slicer_Remote_Add(MultiVolumeExplorer
   GIT_REPOSITORY ${EP_GIT_PROTOCOL}://github.com/fedorov/MultiVolumeExplorer.git
-  GIT_TAG b907c39b876a1d5f9eac1359ce6c829c13c53c93
+  GIT_TAG 8be7d7aa3bfb6878a30420ef68c23a9577cc7b1f
   OPTION_NAME Slicer_BUILD_MultiVolumeExplorer
   OPTION_DEPENDS "Slicer_BUILD_QTLOADABLEMODULES;Slicer_BUILD_MULTIVOLUME_SUPPORT;Slicer_USE_PYTHONQT"
   LABELS REMOTE_MODULE
