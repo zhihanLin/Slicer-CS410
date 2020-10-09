@@ -24,8 +24,14 @@ set(${KIT}_SRCS
   vtkMRML${MODULE_NAME}JsonStorageNode.cxx
   vtkCurveGenerator.cxx
   vtkCurveGenerator.h
+  vtkCurveMeasurementsCalculator.cxx
+  vtkCurveMeasurementsCalculator.h
   vtkLinearSpline.cxx
   vtkLinearSpline.h
+  vtkMRMLMeasurementAngle.cxx
+  vtkMRMLMeasurementAngle.h
+  vtkMRMLMeasurementLength.cxx
+  vtkMRMLMeasurementLength.h
   vtkParametricPolynomialApproximation.cxx
   vtkParametricPolynomialApproximation.h
   vtkSlicerDijkstraGraphGeodesicPath.cxx
