@@ -18,10 +18,10 @@ jobs:
     
     - name: SuperBuild Cache
       id: superbuild-cache
-      uses: actions/cache@v1
-        with:
-          path: ${{runner.workspace}}/build
-          key: superbuild
+      uses: actions/cache@v2
+      with:
+        path: ${{runner.workspace}}/build
+        key: superbuild
     
     - uses: actions/checkout@v2
     
