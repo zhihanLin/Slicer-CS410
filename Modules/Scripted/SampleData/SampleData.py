@@ -255,7 +255,8 @@ class SampleDataWidget(ScriptedLoadableModuleWidget):
     self.categoryLayout.setContentsMargins(0, 0, 0, 0)
     self.layout.addLayout(self.categoryLayout)
 
-    SampleDataWidget.setCategoriesFromSampleDataSources(self.categoryLayout, slicer.modules.sampleDataSources, self.logic)
+    self.menuHolder = {}
+    SampleDataWidget.setCategoriesFromSampleDataSources(self.categoryLayout, slicer.modules.sampleDataSources, self.logic, self.menuHolder)
     if self.developerMode is False:
       self.setCategoryVisible(self.logic.developmentCategoryName, False)
 
@@ -282,7 +283,7 @@ class SampleDataWidget(ScriptedLoadableModuleWidget):
       del frame
 
   @staticmethod
-  def setCategoriesFromSampleDataSources(categoryLayout, dataSources, logic):
+  def setCategoriesFromSampleDataSources(categoryLayout, dataSources, logic, menuHolder = {}):
     """Update categoryLayout adding buttons for downloading dataSources.
 
     Download buttons are organized in collapsible GroupBox with one GroupBox
@@ -290,8 +291,7 @@ class SampleDataWidget(ScriptedLoadableModuleWidget):
     """
     numberOfColumns = 3
     iconPath = os.path.join(os.path.dirname(__file__).replace('\\','/'), 'Resources','Icons')
-    desktop = qt.QDesktopWidget()
-    mainScreenSize = desktop.availableGeometry(desktop.primaryScreen)
+    mainScreenSize = slicer.util.mainWindow().size
     iconSize = qt.QSize(int(mainScreenSize.width()/15),int(mainScreenSize.height()/10))
 
     categories = sorted(dataSources.keys())
@@ -318,8 +318,8 @@ class SampleDataWidget(ScriptedLoadableModuleWidget):
         if not name:
           name = source.nodeNames[0]
 
-        b = qt.QToolButton()
-        b.setText(name)
+        toolButton = qt.QToolButton()
+        toolButton.setText(name)
 
         # Set thumbnail
         if source.thumbnailFileName:
@@ -336,24 +336,46 @@ class SampleDataWidget(ScriptedLoadableModuleWidget):
               thumbnailImage = thumbnailImageAttempt
               break
         if thumbnailImage and os.path.exists(thumbnailImage):
-          b.setIcon(qt.QIcon(thumbnailImage))
+          toolButton.setIcon(qt.QIcon(thumbnailImage))
 
-        b.setIconSize(iconSize)
-        b.setToolButtonStyle(qt.Qt.ToolButtonTextUnderIcon)
+        toolButton.setIconSize(iconSize)
+        toolButton.setToolButtonStyle(qt.Qt.ToolButtonTextUnderIcon)
         qSize = qt.QSizePolicy()
         qSize.setHorizontalPolicy(qt.QSizePolicy.Expanding)
-        b.setSizePolicy(qSize)
+        toolButton.setSizePolicy(qSize)
 
-        b.name = '%sPushButton' % name
-        layout.addWidget(b, rowIndex, columnIndex)
+        toolButton.name = '%sPushButton' % name
+        layout.addWidget(toolButton, rowIndex, columnIndex)
         columnIndex += 1
         if columnIndex==numberOfColumns:
           rowIndex += 1
           columnIndex = 0
         if source.customDownloader:
-          b.connect('clicked()', lambda s=source: s.customDownloader(s))
+          toolButton.connect('clicked()', lambda s=source: s.customDownloader(s))
         else:
-          b.connect('clicked()', lambda s=source: logic.downloadFromSource(s))
+          toolButton.connect('clicked()', lambda s=source: logic.downloadFromSource(s))
+
+        toolButton.contextMenuPolicy = qt.Qt.ActionsContextMenu
+        menu = qt.QMenu("Options")
+        menuHolder[name] = menu
+        action = qt.QAction("Save as...")
+        menu.addAction(action)
+        menuHolder[name+"_action"] = action
+        toolButton.setMenu(menu)
+        triggerCallable = lambda p=frame, l=logic, s=source: SampleDataWidget.saveAs(p,l,s)
+        action.connect("triggered()", triggerCallable)
+        slicer.modules.button = toolButton #TODO
+
+  @staticmethod
+  def saveAs(parent, logic, source):
+    directoryPath = qt.QFileDialog.getExistingDirectory(parent, "Download and save")
+    if hasattr(source, "loadFiles"):
+      saveLoadFiles = source.loadFiles
+    else:
+      saveLoadFiles = None
+    logic.downloadFromSource(source, alternateDirectoryPath=directoryPath)
+    if saveLoadFiles:
+      source.loadFiles = saveLoadFiles
 
   def logMessage(self, message, logLevel=logging.DEBUG):
     # Set text color based on log level
@@ -593,10 +615,13 @@ class SampleDataLogic(object):
     """Register sample data sources used by SampleData self-test to test module functionalities."""
     self.registerCustomSampleDataSource(**SampleDataTest.CustomDownloaderDataSource)
 
-  def downloadFileIntoCache(self, uri, name, checksum=None):
+  def downloadFileIntoCache(self, uri, name, checksum=None, alternateDirectoryPath=None):
     """Given a uri and and a filename, download the data into
-    a file of the given name in the scene's cache"""
-    destFolderPath = slicer.mrmlScene.GetCacheManager().GetRemoteCacheDirectory()
+    a file of the given name in the scene's cache or the given alternateDirectoryPath"""
+    if alternateDirectoryPath:
+      destFolderPath = alternateDirectoryPath
+    else:
+      destFolderPath = slicer.mrmlScene.GetCacheManager().GetRemoteCacheDirectory()
 
     if not os.access(destFolderPath, os.W_OK):
       try:
@@ -607,15 +632,15 @@ class SampleDataLogic(object):
         self.logMessage('<b>Cache folder %s is not writable</b>' % destFolderPath, logging.ERROR)
     return self.downloadFile(uri, destFolderPath, name, checksum)
 
-  def downloadSourceIntoCache(self, source):
+  def downloadSourceIntoCache(self, source, alternateDirectoryPath=None):
     """Download all files for the given source and return a
     list of file paths for the results"""
     filePaths = []
     for uri,fileName,checksum in zip(source.uris,source.fileNames,source.checksums):
-      filePaths.append(self.downloadFileIntoCache(uri, fileName, checksum))
+      filePaths.append(self.downloadFileIntoCache(uri, fileName, checksum, alternateDirectoryPath))
     return filePaths
 
-  def downloadFromSource(self, source, maximumAttemptsCount=3):
+  def downloadFromSource(self, source, maximumAttemptsCount=3, alternateDirectoryPath=None):
     """Given an instance of SampleDataSource, downloads the associated data and
     load them into Slicer if it applies.
 
@@ -646,7 +671,7 @@ class SampleDataLogic(object):
 
         # Download
         try:
-          filePath = self.downloadFileIntoCache(uri, fileName, checksum)
+          filePath = self.downloadFileIntoCache(uri, fileName, checksum, alternateDirectoryPath=None)
         except ValueError:
           self.logMessage('<b>Download failed (attempt %d of %d)...</b>' % (attemptsCount+1, maximumAttemptsCount), logging.ERROR)
           continue
