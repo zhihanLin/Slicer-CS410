@@ -47,6 +47,16 @@ public:
   /// Copy one type into another (deep copy)
   virtual void Copy(vtkMRMLMeasurement* aEntry);
 
+  /// Measurement computation status
+  /// \sa LastComputationResult, GetLastComputationResult(),
+  /// GetLastComputationResultAsString()
+  enum ComputationResult
+  {
+    OK = 0,
+    InsufficientInput,
+    InternalError
+  };
+
   /// Perform calculation on \sa InputMRMLNode and store the result internally.
   /// The subclasses need to implement this function
   virtual void Compute() = 0;
@@ -92,6 +102,11 @@ public:
   void SetMethodCode(vtkCodedEntry* entry);
   vtkGetObjectMacro(MethodCode, vtkCodedEntry);
 
+  /// Get last computation result
+  vtkGetMacro(LastComputationResult, int);
+  /// Get last computation result as human-readable string
+  const char* GetLastComputationResultAsPrintableString();
+
   /// Get measurement value and units as a single human-readable string.
   std::string GetValueWithUnitsAsPrintableString();
 
@@ -134,6 +149,7 @@ protected:
   vtkCodedEntry* DerivationCode{nullptr}; // min/max/mean
   vtkCodedEntry* UnitsCode{nullptr};      // cubic millimeter
   vtkCodedEntry* MethodCode{nullptr};     // Sum of segmented voxel volumes
+  ComputationResult LastComputationResult{InsufficientInput};
 
   /// Per-control point measurements
   vtkDoubleArray* ControlPointValues{nullptr};
