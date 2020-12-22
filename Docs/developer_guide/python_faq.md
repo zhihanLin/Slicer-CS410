@@ -2,7 +2,116 @@
 
 Frequently asked questions about how to write Python scripts for Slicer.
 
-### How to find a Python function for any Slicer features
+## How to run a CLI module from Python
+
+Here's an example to create a model from a volume using the "Grayscale Model Maker" module:
+
+```python
+def createModelFromVolume(inputVolumeNode):
+  """Create surface mesh from volume node using CLI module"""
+  # Set parameters
+  parameters = {}
+  parameters["InputVolume"] = inputVolumeNode
+  outputModelNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLModelNode")
+  parameters["OutputGeometry"] = outputModelNode
+  # Execute
+  grayMaker = slicer.modules.grayscalemodelmaker
+  cliNode = slicer.cli.runSync(grayMaker, None, parameters)
+  # Process results
+  if cliNode.GetStatus() & cliNode.ErrorsMask:
+    # error
+    errorText = cliNode.GetErrorText()
+    slicer.mrmlScene.RemoveNode(cliNode)
+    raise ValueError("CLI execution failed: " + errorText)
+  # success
+  slicer.mrmlScene.RemoveNode(cliNode)
+  return outputModelNode
+```
+
+To try this, download the MRHead dataset using "Sample Data" module and paste the code above into the Python console and then run this:
+
+```python
+volumeNode = getNode('MRHead')
+modelNode = createModelFromVolume(volumeNode)
+```
+
+A complete example for running a CLI module from a scripted module is available [here](https://github.com/fedorov/ChangeTrackerPy/blob/master/ChangeTracker/ChangeTrackerWizard/ChangeTrackerRegistrationStep.py#L56-L67)
+
+### Get list of parameter names
+
+The following script prints all the parameter names of a CLI parameter node:
+
+```python
+cliModule = slicer.modules.grayscalemodelmaker
+n=cliModule.cliModuleLogic().CreateNode()
+for groupIndex in range(n.GetNumberOfParameterGroups()):
+  print(f'Group: {n.GetParameterGroupLabel(groupIndex)}')
+  for parameterIndex in range(n.GetNumberOfParametersInGroup(groupIndex)):
+    print('  {0} [{1}]: {2}'.format(n.GetParameterName(groupIndex, parameterIndex),
+      n.GetParameterTag(groupIndex, parameterIndex),n.GetParameterLabel(groupIndex, parameterIndex)))
+```
+
+### Passing markups iducials to CLIs
+
+```python
+import SampleData
+sampleDataLogic = SampleData.SampleDataLogic()
+head = sampleDataLogic.downloadMRHead()
+volumesLogic = slicer.modules.volumes.logic()
+headLabel = volumesLogic.CreateLabelVolume(slicer.mrmlScene, head, 'head-label')
+
+fiducialNode = slicer.vtkMRMLAnnotationFiducialNode()
+fiducialNode.SetFiducialWorldCoordinates((1,0,5))
+fiducialNode.SetName('Seed Point')
+fiducialNode.Initialize(slicer.mrmlScene)
+fiducialsList = getNode('Fiducials List')
+
+params = {'inputVolume': head.GetID(), 'outputVolume': headLabel.GetID(), 'seed' : fiducialsList.GetID(), 'iterations' : 2} 
+
+cliNode = slicer.cli.runSync(slicer.modules.simpleregiongrowingsegmentation, None, params)
+```
+
+### Running CLI in the background
+
+If the CLI module is executed using `slicer.cli.run` method then the CLI module runs in a background thread, so the call to `startProcessing` will return right away and the user interface will not be blocked. The `slicer.cli.run` call returns a cliNode (an instance of [vtkMRMLCommandLineModuleNode](http://slicer.org/doc/html/classvtkMRMLCommandLineModuleNode.html)) which can be used to monitor the progress of the module.
+
+In this example we create a simple callback `onProcessingStatusUpdate` that will be called whenever the cliNode is modified.  The status will tell you if the nodes is Pending, Running, or Completed.
+
+```python
+def startProcessing(inputVolumeNode):
+  """Create surface mesh from volume node using CLI module"""
+  # Set parameters
+  parameters = {}
+  parameters["InputVolume"] = inputVolumeNode
+  outputModelNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLModelNode")
+  parameters["OutputGeometry"] = outputModelNode
+  # Start execution in the background
+  grayMaker = slicer.modules.grayscalemodelmaker
+  cliNode = slicer.cli.run(grayMaker, None, parameters)
+  return cliNode
+
+def onProcessingStatusUpdate(cliNode, event):
+  print("Got a %s from a %s" % (event, cliNode.GetClassName()))
+  if cliNode.IsA('vtkMRMLCommandLineModuleNode'):
+    print("Status is %s" % cliNode.GetStatusString())
+  if cliNode.GetStatus() & cliNode.Completed:
+    if cliNode.GetStatus() & cliNode.ErrorsMask:
+      # error
+      errorText = cliNode.GetErrorText()
+      print("CLI execution failed: " + errorText)
+    else:
+      # success
+      print("CLI execution succeeded. Output model node ID: "+cliNode.GetParameterAsString("OutputGeometry"))
+
+volumeNode = getNode('MRHead')
+cliNode = startProcessing(volumeNode)
+cliNode.AddObserver('ModifiedEvent', onProcessingStatusUpdate)
+
+# If you need to cancel the CLI, call
+# cliNode.Cancel()
+```
+
+## How to find a Python function for any Slicer features
 
 All features of Slicer are available via Python scripts. [Slicer script repository](https://www.slicer.org/wiki/Documentation/Nightly/ScriptRepository) contains examples for the most commonly used features.
 
@@ -23,7 +132,7 @@ sliceNode = slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeRed')
 sliceNode.SetSliceResolutionMode(slicer.vtkMRMLSliceNode.SliceResolutionMatchVolumes)
 ```
 
-### How to type file paths in Python
+## How to type file paths in Python
 
 New Python users on Windows often suprised when they enter a path that contain backslash character (`\`) and it just does not work. Since backslash (`\`) is an escape character in Python, it requires special attention when used in string literals. For example, this is incorrect:
 
@@ -43,7 +152,7 @@ In most places, unix-type separators can be used instead of backslash. This is c
 
 See more information in Python documentation: https://docs.python.org/3/tutorial/introduction.html?#strings
 
-### How to include Python modules in an extension
+## How to include Python modules in an extension
 
 Sometimes, it is convenient to add Python modules to the Slicer scripted loadable modules.
 For example, the files associated with a Slicer module could look like this:
