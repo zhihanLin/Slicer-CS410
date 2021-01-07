@@ -479,9 +479,9 @@ QSettings* qSlicerCoreApplicationPrivate::instantiateSettings(bool useTmp)
 #ifdef Slicer_STORE_SETTINGS_IN_APPLICATION_HOME_DIR
   // If a Slicer.ini file is available in the home directory then use that,
   // otherwise use the default one in the user profile folder.
-  // Qt appends organizationName to the directory set in QSettings::setPath, therefore we must include it in the folder name
+  // Qt appends organizationName/organizationDomain to the directory set in QSettings::setPath, therefore we must include it in the folder name
   // (otherwise QSettings() would return a different setting than app->userSettings()).
-  QString iniFileName = QDir(this->SlicerHome).filePath(QString("%1/%2.ini").arg(q->organizationName()).arg(q->applicationName()));
+  QString iniFileName = QDir(this->SlicerHome).filePath(QString("%1/%2.ini").arg(ctkAppLauncherSettings().organizationDir()).arg(q->applicationName()));
   if (QFile(iniFileName).exists())
     {
     // Use settings file in the home folder
@@ -551,7 +551,9 @@ void qSlicerCoreApplicationPrivate::setPythonOsEnviron(const QString& key, const
     return;
     }
   this->CorePythonManager->executeString(
-        QString("import os; os.environ['%1']='%2'; del os").arg(key).arg(value));
+        QString("import os; os.environ[%1]=%2; del os")
+          .arg(qSlicerCorePythonManager::toPythonStringLiteral(key))
+          .arg(qSlicerCorePythonManager::toPythonStringLiteral(value)));
 }
 #endif
 
@@ -967,7 +969,8 @@ void qSlicerCoreApplication::handleCommandLineArguments()
 
     // Set 'sys.executable' so that Slicer can be used as a "regular" python interpreter
     this->corePythonManager()->executeString(
-          QString("import sys; sys.executable = '%1'; del sys").arg(QStandardPaths::findExecutable("PythonSlicer"))
+          QString("import sys; sys.executable = %1; del sys").arg(
+            qSlicerCorePythonManager::toPythonStringLiteral(QStandardPaths::findExecutable("PythonSlicer")))
           );
 
     // Clean memory
@@ -1270,7 +1273,7 @@ QString qSlicerCoreApplication::slicerRevisionUserSettingsFilePath()const
 {
 #ifdef Slicer_STORE_SETTINGS_IN_APPLICATION_HOME_DIR
   this->userSettings(); // ensure applicationName is initialized
-  QString filePath = QString("%1/%2").arg(this->slicerHome()).arg(this->organizationName());
+  QString filePath = QString("%1/%2").arg(this->slicerHome()).arg(ctkAppLauncherSettings().organizationDir());
   QString prefix = this->applicationName();
 #else
   QFileInfo fileInfo = QFileInfo(this->userSettings()->fileName());
