@@ -223,7 +223,8 @@ void vtkMarkupsGlyphSource2D::CreateVertex(vtkPoints *pts, vtkCellArray *verts,
 
 //----------------------------------------------------------------------------
 void vtkMarkupsGlyphSource2D::CreateCross(vtkPoints *pts, vtkCellArray *lines,
-                                          vtkCellArray *polys, vtkUnsignedCharArray *colors,
+                                          vtkCellArray *vtkNotUsed(polys),
+                                          vtkUnsignedCharArray *colors,
                                           double scale, bool dot)
 {
   vtkIdType ptIds[4];
@@ -387,11 +388,11 @@ void vtkMarkupsGlyphSource2D::CreateCircle(vtkPoints *pts, vtkCellArray *lines,
 
   // generate points in a circle
   x[2] = 0.0;
-  double theta = 2.0 * vtkMath::Pi() / double(numberOfPoints);
-  for (int i=0; i<numberOfPoints; i++)
+  double theta = 2.0 * vtkMath::Pi() / static_cast<double>(numberOfPoints);
+  for (unsigned int i=0; i < numberOfPoints; i++)
     {
-    x[0] = 0.5 * cos((double)i*theta);
-    x[1] = 0.5 * sin((double)i*theta);
+    x[0] = 0.5 * cos(static_cast<double>(i) * theta);
+    x[1] = 0.5 * sin(static_cast<double>(i) * theta);
     ptIds[i] = pts->InsertNextPoint(x);
     }
 
@@ -436,7 +437,7 @@ void vtkMarkupsGlyphSource2D::CreateDiamond(vtkPoints *pts, vtkCellArray *lines,
 
 //----------------------------------------------------------------------------
 void vtkMarkupsGlyphSource2D::CreateArrow(vtkPoints *pts, vtkCellArray *lines,
-                                          vtkCellArray *polys, vtkUnsignedCharArray *colors)
+                                          vtkCellArray *vtkNotUsed(polys), vtkUnsignedCharArray *colors)
 {
     //stem
     vtkIdType ptIds[3];
