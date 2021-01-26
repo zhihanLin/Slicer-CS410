@@ -85,7 +85,7 @@ int qSlicerModelsModuleWidgetTest1( int argc, char * argv[] )
   shModuleLogic->SetMRMLScene(scene);
   QScopedPointer<qSlicerSubjectHierarchyPluginLogic> pluginLogic(new qSlicerSubjectHierarchyPluginLogic());
   pluginLogic->setMRMLScene(scene);
-  qSlicerSubjectHierarchyPluginHandler::instance()->setPluginLogic(pluginLogic.get());
+  qSlicerSubjectHierarchyPluginHandler::instance()->setPluginLogic(pluginLogic.data());
   qSlicerSubjectHierarchyPluginHandler::instance()->setMRMLScene(scene);
 
   // Add a model node
@@ -111,8 +111,7 @@ int qSlicerModelsModuleWidgetTest1( int argc, char * argv[] )
   dynamic_cast<QWidget*>(module.widgetRepresentation())->show();
 
   // Add some more model nodes
-
-  vtkMRMLModelNode* modelNode3 = modelsLogic->AddModel(argv[1]);
+  modelsLogic->AddModel(argv[1]);
   shNode->SetItemParent(shNode->GetItemByDataNode(modelNode2), folderA);
 
   modelsLogic->AddModel(argv[1]);
