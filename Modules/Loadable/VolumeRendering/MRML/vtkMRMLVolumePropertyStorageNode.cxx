@@ -87,6 +87,7 @@ int vtkMRMLVolumePropertyStorageNode::ReadDataInternal(vtkMRMLNode *refNode)
     ss >> value;
     vpNode->GetVolumeProperty()->SetInterpolationType(value);
     }
+
   ifs.getline(line, 1024);
   sline = line;
   if (!sline.empty())
@@ -97,6 +98,7 @@ int vtkMRMLVolumePropertyStorageNode::ReadDataInternal(vtkMRMLNode *refNode)
     ss >> value;
     vpNode->GetVolumeProperty()->SetShade(value);
     }
+
   ifs.getline(line, 1024);
   sline = line;
   if (!sline.empty())
@@ -107,6 +109,7 @@ int vtkMRMLVolumePropertyStorageNode::ReadDataInternal(vtkMRMLNode *refNode)
     ss >> value;
     vpNode->GetVolumeProperty()->SetDiffuse(value);
     }
+
   ifs.getline(line, 1024);
   sline = line;
   if (!sline.empty())
@@ -117,6 +120,7 @@ int vtkMRMLVolumePropertyStorageNode::ReadDataInternal(vtkMRMLNode *refNode)
     ss >> value;
     vpNode->GetVolumeProperty()->SetAmbient(value);
     }
+
   ifs.getline(line, 1024);
   sline = line;
   if (!sline.empty())
@@ -127,6 +131,7 @@ int vtkMRMLVolumePropertyStorageNode::ReadDataInternal(vtkMRMLNode *refNode)
     ss >> value;
     vpNode->GetVolumeProperty()->SetSpecular(value);
     }
+
   ifs.getline(line, 1024);
   sline = line;
   if (!sline.empty())
@@ -167,6 +172,18 @@ int vtkMRMLVolumePropertyStorageNode::ReadDataInternal(vtkMRMLNode *refNode)
     vpNode->SetColor(colorTransfer);
     colorTransfer->Delete();
     }
+
+  ifs.getline(line, 1024);
+  sline = line;
+  if (!sline.empty())
+    {
+    vtkTypeBool value;
+    std::stringstream ss;
+    ss << sline;
+    ss >> value;
+    vpNode->GetVolumeProperty()->SetIndependentComponents(value);
+    }
+
   ifs.close();
 
   return result;
@@ -205,6 +222,7 @@ int vtkMRMLVolumePropertyStorageNode::WriteDataInternal(vtkMRMLNode *refNode)
   ofs << vpNode->GetPiecewiseFunctionString(vpNode->GetVolumeProperty()->GetScalarOpacity())  << std::endl;
   ofs << vpNode->GetPiecewiseFunctionString(vpNode->GetVolumeProperty()->GetGradientOpacity())<< std::endl;
   ofs << vpNode->GetColorTransferFunctionString(vpNode->GetVolumeProperty()->GetRGBTransferFunction())<< std::endl;
+  ofs << vpNode->GetVolumeProperty()->GetIndependentComponents() << std::endl;
 
   ofs.close();
 

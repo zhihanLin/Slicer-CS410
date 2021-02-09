@@ -523,6 +523,8 @@ void vtkMRMLVolumeRenderingDisplayableManager::vtkInternal::AddDisplayNode(vtkMR
       {
       pipelineGpu->RayCastMapperGPU->SetInputConnection(0, volumeNode->GetImageDataConnection());
       }
+    // vector volumes should be treated as dependent components
+    displayNode->GetVolumePropertyNode()->GetVolumeProperty()->SetIndependentComponents(!volumeNode->IsA("vtkMRMLVectorVolumeNode"));
     // Add volume actor to renderer and local cache
     this->External->GetRenderer()->AddVolume(pipelineGpu->VolumeActor);
     // Add pipeline
