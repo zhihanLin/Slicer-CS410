@@ -14,7 +14,7 @@
 
   This file was originally developed by Kyle Sunderland, PerkLab, Queen's University
   and was supported through CANARIE's Research Software Program, Cancer
-  Care Ontario, OpenAnatomy, and Brigham and Women’s Hospital through NIH grant R01MH112748.
+  Care Ontario, OpenAnatomy, and Brigham and Women's Hospital through NIH grant R01MH112748.
 
 ==============================================================================*/
 
@@ -200,6 +200,21 @@ void vtkSlicerPlaneRepresentation2D::UpdateFromMRML(vtkMRMLNode* caller, unsigne
   this->PlaneFillActor->SetVisibility(visible);
   this->PlaneOutlineActor->SetVisibility(visible);
   this->ArrowActor->SetVisibility(visible);
+
+  // Properties label display
+  if (visible && this->MarkupsDisplayNode->GetPropertiesLabelVisibility()
+    && this->AnyPointVisibilityOnSlice
+    && markupsNode->GetNumberOfDefinedControlPoints(true) > 0) // including preview
+    {
+    double textPos[3] = { 0.0,  0.0, 0.0 };
+    this->GetNthControlPointDisplayPosition(0, textPos);
+    this->TextActor->SetDisplayPosition(static_cast<int>(textPos[0]), static_cast<int>(textPos[1]));
+    this->TextActor->SetVisibility(true);
+    }
+  else
+    {
+    this->TextActor->SetVisibility(false);
+    }
 
   if (!visible)
     {
