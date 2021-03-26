@@ -95,7 +95,7 @@ We invite commercial entities to use 3D Slicer.
 
 ### Slicer's License makes Commercial Use Available
 
-- 3D Slicer is a Free Open Source Software distributed under a BSD style license.
+- 3D Slicer is a free open source software distributed under a BSD style license.
 - The license does not impose restrictions on the use of the software.
 - 3D Slicer is NOT FDA approved. It is the users responsibility to ensure compliance with applicable rules and regulations.
 - For details, please see the 3D Slicer Software License Agreement.
@@ -104,7 +104,7 @@ We invite commercial entities to use 3D Slicer.
 
 - [Ebatinca SL](https://ebatinca.com/) is an international technology company in Las Palmas, Spain focused on technology for sustainable development.
 - [Isomics](http://www.isomics.com/) uses 3D Slicer in a variety of academic and commercial research partnerships in fields such as planning and guidance for neurosurgery, quantitative imaging for clinical trials, clinical image informatics.
-- [Kitware](http://www.kitware.com/opensource/slicer.html) Integral to continuing to support the 3D Slicer community, Kitware is also offering consulting services in response to the rapidly growing demand for the development of proprietary applications and commercial products based on 3D Slicer. Kitware has used 3D Slicer to rapidly prototype solutions in nearly every aspect of medical imaging and is also collaborating on the development of commercial pre-clinical and clinical products based on 3D Slicer.
+- [Kitware](http://www.kitware.com/opensource/slicer.html) focuses on solving the world’s most complex scientific challenges through customized software solutions. The company has a long history of contributing to open source platforms that serve as the foundation of many medical visualization and data processing applications. Kitware helps customers develop commercial products based on 3D Slicer and has used the platform to rapidly prototype solutions in nearly every aspect of medical imaging.
 - [Pixel Medical](http://pixelmedical.ca) builds on and contributes to 3D Slicer to develop innovative medical software from idea to clinical prototype to finished product, and to support academic research projects. Areas of expertise include radiation therapy, image guided therapy, virtual & augmented reality, hardware & device support, and machine learning & artificial intelligence.
 
 _Listed in alphabetical order._
