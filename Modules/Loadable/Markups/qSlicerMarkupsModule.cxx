@@ -13,14 +13,11 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 
-==============================================================================*/
+  ==============================================================================*/
 
 // Qt includes
 #include <QDebug>
 #include <QSettings>
-
-// Markups Logic includes
-#include <vtkSlicerMarkupsLogic.h>
 
 // MRMLDisplayableManager includes
 #include <vtkMRMLSliceViewDisplayableManagerFactory.h>
@@ -28,7 +25,6 @@
 
 // QTGUI includes
 #include <qSlicerApplication.h>
-//#include <qSlicerCoreApplication.h>
 #include <qSlicerIOManager.h>
 #include <qSlicerNodeWriter.h>
 
@@ -36,18 +32,43 @@
 #include "qSlicerSubjectHierarchyPluginHandler.h"
 #include "qSlicerSubjectHierarchyMarkupsPlugin.h"
 
-// Markups includes
+// Markups module includes
 #include "qSlicerMarkupsModule.h"
 #include "qSlicerMarkupsModuleWidget.h"
 #include "qSlicerMarkupsReader.h"
 #include "qSlicerMarkupsWriter.h"
-//#include "qSlicerMarkupsSettingsPanel.h"
-//#include "vtkSlicerMarkupsLogic.h"
+
+// Markups nodes includes
+#include "vtkMRMLMarkupsAngleNode.h"
 #include "vtkMRMLMarkupsDisplayNode.h"
+#include "vtkMRMLMarkupsClosedCurveNode.h"
+#include "vtkMRMLMarkupsCurveNode.h"
+#include "vtkMRMLMarkupsFiducialNode.h"
+#include "vtkMRMLMarkupsLineNode.h"
+#include "vtkMRMLMarkupsPlaneNode.h"
+#include "vtkMRMLMarkupsROINode.h"
+
+// Markups logic includes
+#include "vtkSlicerMarkupsLogic.h"
+
+// Makrups vtk widgets includes
+#include "vtkSlicerAngleWidget.h"
+#include "vtkSlicerClosedCurveWidget.h"
+#include "vtkSlicerCurveWidget.h"
+#include "vtkSlicerLineWidget.h"
+#include "vtkSlicerPlaneWidget.h"
+#include "vtkSlicerPointsWidget.h"
+#include "vtkSlicerROIWidget.h"
+
+// Markups widgets
+#include "qSlicerMarkupsROIWidget.h"
+#include "qSlicerMarkupsAngleMeasurementsWidget.h"
+#include "qSlicerMarkupsCurveSettingsWidget.h"
+#include "qSlicerMarkupsAdditionalOptionsWidgetsFactory.h"
 
 // DisplayableManager initialization
 #include <vtkAutoInit.h>
-VTK_MODULE_INIT(vtkSlicerMarkupsModuleMRMLDisplayableManager)
+VTK_MODULE_INIT(vtkSlicerMarkupsModuleMRMLDisplayableManager);
 
 //-----------------------------------------------------------------------------
 /// \ingroup Slicer_QtModules_Markups
@@ -68,8 +89,7 @@ qSlicerMarkupsModulePrivate::qSlicerMarkupsModulePrivate() = default;
 
 //-----------------------------------------------------------------------------
 qSlicerMarkupsModule::qSlicerMarkupsModule(QObject* _parent)
-  : Superclass(_parent)
-  , d_ptr(new qSlicerMarkupsModulePrivate)
+  : Superclass(_parent), d_ptr(new qSlicerMarkupsModulePrivate)
 {
 }
 
@@ -112,12 +132,43 @@ QIcon qSlicerMarkupsModule::icon()const
   return QIcon(":/Icons/Markups.png");
 }
 
-
-
 //-----------------------------------------------------------------------------
 void qSlicerMarkupsModule::setup()
 {
   this->Superclass::setup();
+
+  vtkSlicerMarkupsLogic *logic = vtkSlicerMarkupsLogic::SafeDownCast(this->logic());
+  if (!logic)
+    {
+    qCritical() << Q_FUNC_INFO << ": cannot get Markups logic.";
+    return;
+    }
+
+  auto fiducialNode = vtkSmartPointer<vtkMRMLMarkupsFiducialNode>::New();
+  auto lineNode = vtkSmartPointer<vtkMRMLMarkupsLineNode>::New();
+  auto angleNode = vtkSmartPointer<vtkMRMLMarkupsAngleNode>::New();
+  auto curveNode = vtkSmartPointer<vtkMRMLMarkupsCurveNode>::New();
+  auto closedCurveNode = vtkSmartPointer<vtkMRMLMarkupsClosedCurveNode>::New();
+  auto planeNode = vtkSmartPointer<vtkMRMLMarkupsPlaneNode>::New();
+  auto roiNode = vtkSmartPointer<vtkMRMLMarkupsROINode>::New();
+
+  auto pointsWidget = vtkSmartPointer<vtkSlicerPointsWidget>::New();
+  auto lineWidget =  vtkSmartPointer<vtkSlicerLineWidget>::New();
+  auto angleWidget = vtkSmartPointer<vtkSlicerAngleWidget>::New();
+  auto curveWidget = vtkSmartPointer<vtkSlicerCurveWidget>::New();
+  auto closedCurveWidget = vtkSmartPointer<vtkSlicerClosedCurveWidget>::New();
+  auto planeWidget = vtkSmartPointer<vtkSlicerPlaneWidget>::New();
+  auto roiWidget = vtkSmartPointer<vtkSlicerROIWidget>::New();
+
+  // Register markups
+  // NOTE: the order of registration determines the order of the create push buttons in the GUI
+  logic->RegisterMarkupsNode(fiducialNode, pointsWidget);
+  logic->RegisterMarkupsNode(lineNode, lineWidget);
+  logic->RegisterMarkupsNode(angleNode, angleWidget);
+  logic->RegisterMarkupsNode(curveNode, curveWidget);
+  logic->RegisterMarkupsNode(closedCurveNode, closedCurveWidget);
+  logic->RegisterMarkupsNode(planeNode, planeWidget);
+  logic->RegisterMarkupsNode(roiNode, roiWidget);
 
   // Register displayable managers (same displayable manager handles both slice and 3D views)
   vtkMRMLSliceViewDisplayableManagerFactory::GetInstance()->RegisterDisplayableManager("vtkMRMLMarkupsDisplayableManager");
@@ -131,12 +182,12 @@ void qSlicerMarkupsModule::setup()
 
   // settings
   /*
-  if (qSlicerApplication::application())
+    if (qSlicerApplication::application())
     {
     qSlicerMarkupsSettingsPanel* panel =
-      new qSlicerMarkupsSettingsPanel;
+    new qSlicerMarkupsSettingsPanel;
     qSlicerApplication::application()->settingsDialog()->addPanel(
-      "Markups", panel);
+    "Markups", panel);
     panel->setMarkupsLogic(vtkSlicerMarkupsLogic::SafeDownCast(this->logic()));
     }
   */
@@ -146,9 +197,23 @@ void qSlicerMarkupsModule::setup()
 }
 
 //-----------------------------------------------------------------------------
-qSlicerAbstractModuleRepresentation * qSlicerMarkupsModule::createWidgetRepresentation()
+qSlicerAbstractModuleRepresentation* qSlicerMarkupsModule::createWidgetRepresentation()
 {
-  return new qSlicerMarkupsModuleWidget;
+
+  // Create and configure module widget.
+  auto moduleWidget = new qSlicerMarkupsModuleWidget();
+
+  // Create and configure the additional widgets
+  auto optionsWidgetFactory = qSlicerMarkupsAdditionalOptionsWidgetsFactory::instance();
+  optionsWidgetFactory->registerAdditionalOptionsWidget(new qSlicerMarkupsAngleMeasurementsWidget());
+  optionsWidgetFactory->registerAdditionalOptionsWidget(new qSlicerMarkupsCurveSettingsWidget());
+  optionsWidgetFactory->registerAdditionalOptionsWidget(new qSlicerMarkupsROIWidget());
+
+  // Set the number of columns for the grid of "add markups buttons" to the number of markups
+  // regitered in this module.
+  moduleWidget->setCreateMarkupsButtonsColumns(7);
+
+  return moduleWidget;
 }
 
 //-----------------------------------------------------------------------------
