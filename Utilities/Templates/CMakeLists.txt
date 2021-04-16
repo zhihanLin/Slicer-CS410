@@ -11,3 +11,7 @@ configure_file(
 )
 
 include(SlicerExtensionTemplatesGenerator)
+
+# Skip from build until build error is fixed
+# # See https://github.com/Slicer/Slicer/issues/5589#issuecomment-820645257
+# add_subdirectory(Modules/LoadableCustomMarkups)
