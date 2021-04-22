@@ -66,8 +66,11 @@ Readers may support 2D, 3D, and 4D images of various types, such as scalar, vect
 - [SlicerRT extension](http://www.slicerrt.org/)
   - **Vista cone beam optical scanner volume** (.vff)
   - **DOSXYZnrc 3D dose** (.3ddose)
-- [SlicerHeart extension](https://github.com/SlicerHeart/SlicerHeart): 2D/3D/4D ultrasound (GE, Philips, Eigen Artemis, and other)
+- [SlicerHeart extension](https://github.com/SlicerHeart/SlicerHeart): 2D/3D/4D ultrasound (GE, Philips, Eigen Artemis, and other; reading only)
+  - **Philips 4D ultrasound**: from Cartesian DICOM exported from QLab
   - **GE Kretz 3D ultrasound** (.vol, .v01)
+  - **Eigen Artemis 3D ultrasound**
+  - Any 3D/4D ultrasound image and ECG signal: if the user obtains [Image3dAPI](https://github.com/SlicerHeart/SlicerHeart#open-image3d-api) plugin from the vendor (GE Voluson, Philips, Siemens, etc.)
 - [RawImageGuess extension](https://github.com/acetylsalicyl/SlicerRawImageGuess)
   - **RAW volume** (.raw): requires manual setting of header parameters
   - **Samsung 3D ultrasound** (.mvl): requires manual setting of header parameters
@@ -81,16 +84,18 @@ Readers may support 2D, 3D, and 4D images of various types, such as scalar, vect
 
 Surface or volumetric meshes.
 
-- [**VTK Polygonal Data**](https://vtk.org/wp-content/uploads/2015/04/file-formats.pdf) (.vtk, .vtp): Default coordinate system: LPS. Coordinate system (LPS/RAS) can be specified in header.
+- [**VTK Polygonal Data**](https://vtk.org/wp-content/uploads/2015/04/file-formats.pdf) (.vtk, .vtp): Default coordinate system: LPS. Coordinate system (LPS/RAS) can be specified in header. Full color (RGB or RGBA) meshes can be read and written (color must be assigned as point scalar data of `unsigned char` type and 3 or 4 components). Texture image can be applied using "Texture model" module (in SlicerIGT extension).
 - [**VTK Unstructured Grid Data**](https://vtk.org/wp-content/uploads/2015/04/file-formats.pdf) (.vtk, .vtu): Volumetric mesh. Default coordinate system: LPS. Coordinate system (LPS/RAS) can be specified in header.
 - **STereoLithography** (.stl): Format most commonly used for 3D printing. Default coordinate system: LPS. Coordinate system (LPS/RAS) can be specified in header.
-- **Wavefront OBJ** (.obj): Default coordinate system: LPS. Coordinate system (LPS/RAS) can be specified in header.
-- **Stanford Triangle Format** (.ply): Default coordinate system: LPS. Coordinate system (LPS/RAS) can be specified in header.
+- **Wavefront OBJ** (.obj): Default coordinate system: LPS. Coordinate system (LPS/RAS) can be specified in header. Texture image can be applied using "Texture model" module (in SlicerIGT extension).
+- **Stanford Triangle Format** (.ply): Default coordinate system: LPS. Coordinate system (LPS/RAS) can be specified in header. Full color (RGB or RGBA) meshes can be read and written (color must be assigned to vertex data in `uchar` type properties named `red`, `green`, `blue`, and optional `alpha`). Texture image can be applied using "Texture model" module (in SlicerIGT extension).
 - **BYU** (.byu, .g; reading only): Coordinate system: LPS.
 - **UCD** (.ucd; reading only): Coordinate system: LPS.
 - **ITK meta** (.meta; reading only): Coordinate system: LPS.
 - [FreeSurfer extension](https://github.com/PerkLab/SlicerFreeSurfer):
-  - **Freesurfer surfaces** (.orig, .inflated, .sphere, .white, .smoothwm, .pial; read-only)
+  - **Freesurfer surfaces** (.orig, .inflated, .sphere, .white, .smoothwm, .pial; reading only)
+- [SlicerHeart extension](https://github.com/SlicerHeart/SlicerHeart:
+  - **CARTO surface model** (.vtk; writing only): special .vtk polydata file format variant, which contains patient name and ID to allow import into CARTO cardiac electrophysiology mapping systems
 
 ### Segmentations
 
@@ -112,7 +117,7 @@ Surface or volumetric meshes.
 
 ### Markups
 
-- **Markups JSON** (.mkp.json): fiducial list, line, curve, closed curve, plane, etc. Default coordinate system: LPS. Coordinate system (LPS/RAS) can be specified in image header.
+- **Markups JSON** (.mkp.json): fiducial list, line, curve, closed curve, plane, etc. Default coordinate system: LPS. Coordinate system (LPS/RAS) can be specified in image header. JSON schema is available [here](https://github.com/Slicer/Slicer/tree/master/Modules/Loadable/Markups/Resources/Schema).
 - **Markups CSV** (.fcsv): fiducial list points legacy file format. Default coordinate system: LPS. Coordinate system (LPS/RAS) can be specified in image header.
 - **Annotation CSV** (.acsv): annotation ruler, ROI
 
