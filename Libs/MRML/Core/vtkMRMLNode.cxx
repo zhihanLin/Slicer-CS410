@@ -514,21 +514,28 @@ void vtkMRMLNode::WriteXML(ostream& of, int nIndent)
     const std::string& referenceRole = it->first;
     int numReferencedNodes = this->GetNumberOfNodeReferences(referenceRole.c_str());
 
-    if (numReferencedNodes > 0)
-      {
-      ssRef << referenceRole << ":";
-      }
-
+    bool referenceFound = false;
     for (int n=0; n < numReferencedNodes; n++)
       {
       const char * id = this->GetNthNodeReferenceID(referenceRole.c_str(), n);
-      ssRef << id;
-      if (n < numReferencedNodes-1)
+      if (!id)
         {
+        continue;
+        }
+      if (referenceFound)
+        {
+        // additional ID
         ssRef << " ";
         }
+      else
+        {
+        // first ID
+        ssRef << referenceRole << ":";
+        referenceFound = true;
+        }
+      ssRef << id;
       }
-    if (numReferencedNodes > 0)
+    if (referenceFound)
       {
       ssRef << ";";
       }
@@ -1052,6 +1059,51 @@ void vtkMRMLNode::UpdateReferences()
         {
         ++i;
         }
+      }
+    }
+}
+
+//-----------------------------------------------------------
+void vtkMRMLNode::RemoveInvalidReferences(const std::set<std::string>& validNodeIDs)
+{
+  // If the referenced node is not in the imported scene then the reference must be
+  // removed to make sure it will not be linked to a node in the main scene now
+  // or later (as new nodes are added to the main scene).
+  // 2. If the reference node is among the existing
+  if (!this->Scene)
+    {
+    return;
+    }
+  NodeReferencesType::iterator it;
+  for (it = this->NodeReferences.begin(); it != this->NodeReferences.end(); it++)
+    {
+    for (unsigned int i=0; i<it->second.size();)
+      {
+      vtkMRMLNodeReference* reference = it->second[i];
+      char* referencedNodeID = reference->GetReferencedNodeID();
+      if (!referencedNodeID || strlen(referencedNodeID) == 0)
+        {
+        // Reference is already removed, no need to remove it
+        ++i;
+        continue;
+        }
+      if (validNodeIDs.find(referencedNodeID) != validNodeIDs.end())
+        {
+        // Reference to a valid node, keep it
+        ++i;
+        continue;
+        }
+      vtkMRMLNode* referencedNode = this->Scene->GetNodeByID(referencedNodeID);
+      if (referencedNode && referencedNode->IsSingleton())
+        {
+        // Reference to a singleton node, keep it
+        // (for example, unit nodes are not saved with the scene
+        // but expected to reference to whatever unit is in the current scene)
+        ++i;
+        continue;
+        }
+      // This reference is not to a valid node, remove it
+      this->RemoveNthNodeReferenceID(reference->GetReferenceRole(), i);
       }
     }
 }
