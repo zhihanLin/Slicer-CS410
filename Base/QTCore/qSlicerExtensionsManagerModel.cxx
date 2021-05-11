@@ -40,6 +40,7 @@
 
 // qRestAPI includes
 #include <qMidasAPI.h>
+#include <qRestAPI.h>
 #include <qRestResult.h>
 
 // QtCore includes
@@ -224,7 +225,7 @@ public:
 
 
   qSlicerExtensionsManagerModel::ExtensionMetadataType retrieveExtensionMetadata(
-    const qMidasAPI::ParametersType& parameters);
+    const qRestAPI::Parameters& parameters);
 
   void initializeColumnIdToNameMap(int columnIdx, const char* columnName);
   QHash<int, QString> ColumnIdToName;
@@ -233,10 +234,10 @@ public:
   bool NewExtensionEnabledByDefault;
 
   QNetworkAccessManager NetworkManager;
-  qMidasAPI CheckForUpdatesApi;
+  qRestAPI CheckForUpdatesApi;
   QHash<QUuid, UpdateCheckInformation> CheckForUpdatesRequests;
 
-  qMidasAPI GetExtensionMetadataApi;
+  qRestAPI GetExtensionMetadataApi;
 
   QHash<QString, UpdateDownloadInformation> AvailableUpdates;
 
@@ -253,7 +254,7 @@ public:
 
   // Restore previous extension tab may want to run lots of queries.
   // Results are cached in this variable to improve performance.
-  QMap<QString, ExtensionMetadataType> MidasResponseCache;
+  QMap<QString, ExtensionMetadataType> ServerResponseCache;
 
   QMap<qSlicerExtensionDownloadTask*, QString> ActiveTasks;
 };
@@ -313,12 +314,9 @@ void qSlicerExtensionsManagerModelPrivate::init()
                    q, SLOT(identifyIncompatibleExtensions()));
 
   QObject::connect(&this->CheckForUpdatesApi,
-                   SIGNAL(resultReceived(QUuid,QList<QVariantMap>)),
-                   q, SLOT(onUpdateCheckComplete(QUuid,QList<QVariantMap>)));
+                   SIGNAL(finished(QUuid)),
+                   q, SLOT(onUpdateCheckFinished(QUuid)));
 
-  QObject::connect(&this->CheckForUpdatesApi,
-                   SIGNAL(errorReceived(QUuid,QString)),
-                   q, SLOT(onUpdateCheckFailed(QUuid)));
 }
 
 // --------------------------------------------------------------------------
@@ -355,15 +353,15 @@ void qSlicerExtensionsManagerModelPrivate::log(const QString& text, ctkErrorLogL
     }
   else if (level == ctkErrorLogLevel::Critical)
     {
-    qCritical() << text;
+    qCritical().noquote() << text;
     }
   else if (level == ctkErrorLogLevel::Warning)
     {
-    qWarning() << text;
+    qWarning().noquote() << text;
     }
   else
     {
-    qDebug() << text;
+    qDebug().noquote() << text;
     }
   emit q->messageLogged(text, level);
 }
@@ -952,7 +950,7 @@ QVariantMap qSlicerExtensionsManagerModelPrivate::getExtensionsInfoFromPreviousI
       QString description;
       if (!q->isExtensionInstalled(extensionName))
         {
-        qMidasAPI::ParametersType parameters;
+        qRestAPI::Parameters parameters;
         parameters["productname"] = extensionName;
         parameters["slicer_revision"] = q->slicerRevision();
         parameters["os"] = q->slicerOs();
@@ -994,32 +992,37 @@ void qSlicerExtensionsManagerModelPrivate::initializeColumnIdToNameMap(int colum
 
 // --------------------------------------------------------------------------
 qSlicerExtensionsManagerModel::ExtensionMetadataType qSlicerExtensionsManagerModelPrivate
-::retrieveExtensionMetadata(const qMidasAPI::ParametersType& parameters)
+::retrieveExtensionMetadata(const qRestAPI::Parameters& parameters)
 {
   Q_Q(const qSlicerExtensionsManagerModel);
 
   ExtensionMetadataType result;
 
-  QString midasResponseCacheKey = q->serverUrl().toString();
+  QString serverResponseCacheKey = q->serverUrl().toString();
   foreach(const QString & parametersName, parameters.keys())
     {
-    midasResponseCacheKey += ";" + parameters[parametersName];
+    serverResponseCacheKey += ";" + parameters[parametersName];
     }
-  if (this->MidasResponseCache.contains(midasResponseCacheKey))
+  if (this->ServerResponseCache.contains(serverResponseCacheKey))
     {
-    result = this->MidasResponseCache[midasResponseCacheKey];
+    result = this->ServerResponseCache[serverResponseCacheKey];
     }
   else
     {
-    this->GetExtensionMetadataApi.setServerUrl(q->serverUrl().toString());
+    this->GetExtensionMetadataApi.setServerUrl(q->serverUrl().toString() + "/api/json");
     int maxWaitingTimeInMSecs = 2500;
     this->GetExtensionMetadataApi.setTimeOut(maxWaitingTimeInMSecs);
-    QUuid queryUuid = this->GetExtensionMetadataApi.get("midas.slicerpackages.extension.list", parameters);
+    qRestAPI::Parameters queryParameters = parameters;
+    queryParameters["method"] = "midas.slicerpackages.extension.list";
+    QUuid queryUuid = this->GetExtensionMetadataApi.get("", queryParameters);
 
     QScopedPointer<qRestResult> restResult(this->GetExtensionMetadataApi.takeResult(queryUuid));
+
     QString errorText; // if any error occurs then this will be set to non-empty
     if(restResult)
       {
+      qMidasAPI::parseMidasResponse(restResult.data(), restResult->response());
+
       QList<QVariantMap> results = restResult->results();
       // extension manager returned OK
       if (results.count() == 0)
@@ -1040,7 +1043,7 @@ qSlicerExtensionsManagerModel::ExtensionMetadataType qSlicerExtensionsManagerMod
       else
         {
         // extension manager returned multiple results, this is not expected, do not use the results
-        errorText = QString("expected 1 results, received %1").arg(results.count());
+        errorText = QString("expected 0 or 1 result, received %1").arg(results.count());
         }
       }
     else
@@ -1061,7 +1064,7 @@ qSlicerExtensionsManagerModel::ExtensionMetadataType qSlicerExtensionsManagerMod
         .arg(errorText));
       return ExtensionMetadataType();
       }
-    this->MidasResponseCache[midasResponseCacheKey] = result;
+    this->ServerResponseCache[serverResponseCacheKey] = result;
     }
 
   ExtensionMetadataType updatedExtensionMetadata;
@@ -1096,22 +1099,6 @@ QUrl qSlicerExtensionsManagerModel::serverUrl()const
   return QUrl(settings.value("Extensions/ServerUrl").toString());
   //HS Uncomment the following line for debugging and comment above line.
   //return QUrl("http://10.171.2.133:8080");
-}
-
-// --------------------------------------------------------------------------
-QUrl qSlicerExtensionsManagerModel::serverUrlWithPackagePath()const
-{
-  QUrl url(this->serverUrl());
-  url.setPath(url.path() + "/slicerpackages");
-  return url;
-}
-
-// --------------------------------------------------------------------------
-QUrl qSlicerExtensionsManagerModel::serverUrlWithExtensionsStorePath()const
-{
-  QUrl url(this->serverUrl());
-  url.setPath(url.path() + "/slicerappstore");
-  return url;
 }
 
 // --------------------------------------------------------------------------
@@ -1351,7 +1338,7 @@ qSlicerExtensionsManagerModel::ExtensionMetadataType qSlicerExtensionsManagerMod
     return ExtensionMetadataType();
     }
 
-  qMidasAPI::ParametersType parameters;
+  qRestAPI::Parameters parameters;
   parameters["extension_id"] = extensionId;
 
   return d->retrieveExtensionMetadata(parameters);
@@ -1368,7 +1355,7 @@ qSlicerExtensionsManagerModel::ExtensionMetadataType qSlicerExtensionsManagerMod
     return ExtensionMetadataType();
     }
 
-  qMidasAPI::ParametersType parameters;
+  qRestAPI::Parameters parameters;
   parameters["productname"] = extensionName;
   parameters["slicer_revision"] = this->slicerRevision();
   parameters["os"] = this->slicerOs();
@@ -1616,7 +1603,7 @@ bool qSlicerExtensionsManagerModel::installExtension(
         continue;
         }
 
-      qMidasAPI::ParametersType parameters;
+      qRestAPI::Parameters parameters;
       parameters["productname"] = dependencyName;
       parameters["slicer_revision"] = this->slicerRevision();
       parameters["os"] = this->slicerOs();
@@ -1712,7 +1699,7 @@ void qSlicerExtensionsManagerModel::checkForUpdates(bool installUpdates)
 {
   Q_D(qSlicerExtensionsManagerModel);
 
-  d->CheckForUpdatesApi.setServerUrl(this->serverUrl().toString());
+  d->CheckForUpdatesApi.setServerUrl(this->serverUrl().toString() + "/api/json");
 
   // Loop over extensions
   foreach (const QString& extensionName, this->installedExtensions())
@@ -1723,7 +1710,7 @@ void qSlicerExtensionsManagerModel::checkForUpdates(bool installUpdates)
       extensionMetadata.value("extension_id").toString();
 
     // Build parameters to query server about the extension
-    qMidasAPI::ParametersType parameters;
+    qRestAPI::Parameters parameters;
     if (!extensionId.isEmpty())
       {
       parameters["extension_id"] = extensionId;
@@ -1737,9 +1724,9 @@ void qSlicerExtensionsManagerModel::checkForUpdates(bool installUpdates)
       }
 
     // Issue the query
+    parameters["method"] = "midas.slicerpackages.extension.list";
     const QUuid& requestId =
-      d->CheckForUpdatesApi.get("midas.slicerpackages.extension.list",
-                                parameters);
+      d->CheckForUpdatesApi.get("", parameters);
 
     // Store information about the request
     UpdateCheckInformation updateInfo;
@@ -1759,6 +1746,23 @@ bool qSlicerExtensionsManagerModel::isExtensionUpdateAvailable(
 {
   Q_D(const qSlicerExtensionsManagerModel);
   return d->AvailableUpdates.contains(extensionName);
+}
+
+// --------------------------------------------------------------------------
+void qSlicerExtensionsManagerModel::onUpdateCheckFinished(const QUuid& requestId)
+{
+  Q_D(qSlicerExtensionsManagerModel);
+
+  QScopedPointer<qRestResult> restResult(d->CheckForUpdatesApi.takeResult(requestId));
+  bool success = restResult.isNull() ? false : qMidasAPI::parseMidasResponse(restResult.data(), restResult->response());
+  if (success)
+    {
+    this->onUpdateCheckComplete(requestId, restResult->results());
+    }
+  else
+    {
+    this->onUpdateCheckFailed(requestId);
+    }
 }
 
 // --------------------------------------------------------------------------

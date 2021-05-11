@@ -74,8 +74,6 @@ public:
   typedef QVariantMap ExtensionMetadataType;
 
   Q_INVOKABLE QUrl serverUrl()const;
-  Q_INVOKABLE QUrl serverUrlWithPackagePath()const;
-  Q_INVOKABLE QUrl serverUrlWithExtensionsStorePath()const;
 
   Q_INVOKABLE QString extensionsInstallPath()const;
 
@@ -410,6 +408,8 @@ protected slots:
 
   void onUpdateDownloadProgress(qSlicerExtensionDownloadTask* task,
                                 qint64 received, qint64 total);
+
+  void onUpdateCheckFinished(const QUuid& requestId);
 
   void onUpdateCheckComplete(const QUuid& requestId,
                              const QList<QVariantMap>& results);
