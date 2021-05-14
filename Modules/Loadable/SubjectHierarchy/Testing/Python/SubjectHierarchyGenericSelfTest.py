@@ -104,6 +104,7 @@ class SubjectHierarchyGenericSelfTestTest(ScriptedLoadableModuleTest):
     self.section_LoadScene()
     self.section_TestCircularParenthood()
     self.section_AttributeFilters()
+    self.section_ComboboxFeatures()
 
     logging.info('Test finished')
 
@@ -470,22 +471,22 @@ class SubjectHierarchyGenericSelfTestTest(ScriptedLoadableModuleTest):
       # Check include node attribute name filter
       self.assertEqual(shProxyModel.acceptedItemCount(shNode.GetSceneItemID()), 9)
       filteredObject.includeNodeAttributeNamesFilter = ['Markups.MovingInSliceView']
-      self.assertEqual(shProxyModel.acceptedItemCount(shNode.GetSceneItemID()), 6)
+      self.assertEqual(shProxyModel.acceptedItemCount(shNode.GetSceneItemID()), 5)
       filteredObject.addNodeAttributeFilter('Sajt')
       self.assertEqual(shProxyModel.acceptedItemCount(shNode.GetSceneItemID()), 9)
       filteredObject.includeNodeAttributeNamesFilter = []
       self.assertEqual(shProxyModel.acceptedItemCount(shNode.GetSceneItemID()), 9)
       # Check attribute value filter
       filteredObject.addNodeAttributeFilter('Markups.MovingMarkupIndex', 3)
-      self.assertEqual(shProxyModel.acceptedItemCount(shNode.GetSceneItemID()), 4)
+      self.assertEqual(shProxyModel.acceptedItemCount(shNode.GetSceneItemID()), 3)
       filteredObject.includeNodeAttributeNamesFilter = []
       self.assertEqual(shProxyModel.acceptedItemCount(shNode.GetSceneItemID()), 9)
       filteredObject.addNodeAttributeFilter('Markups.MovingMarkupIndex', '3')
-      self.assertEqual(shProxyModel.acceptedItemCount(shNode.GetSceneItemID()), 4)
+      self.assertEqual(shProxyModel.acceptedItemCount(shNode.GetSceneItemID()), 3)
       filteredObject.includeNodeAttributeNamesFilter = []
       self.assertEqual(shProxyModel.acceptedItemCount(shNode.GetSceneItemID()), 9)
 
-      # ChecfilteredObjectk exclude node attribute name filter (overrides include node attribute name filter)
+      # Check exclude node attribute name filter (overrides include node attribute name filter)
       filteredObject.excludeNodeAttributeNamesFilter = ['Markups.MovingInSliceView']
       self.assertEqual(shProxyModel.acceptedItemCount(shNode.GetSceneItemID()), 5)
       filteredObject.excludeNodeAttributeNamesFilter = []
@@ -494,7 +495,7 @@ class SubjectHierarchyGenericSelfTestTest(ScriptedLoadableModuleTest):
       filteredObject.includeNodeAttributeNamesFilter = ['Markups.MovingMarkupIndex']
       self.assertEqual(shProxyModel.acceptedItemCount(shNode.GetSceneItemID()), 9)
       filteredObject.excludeNodeAttributeNamesFilter = ['Markups.MovingInSliceView']
-      self.assertEqual(shProxyModel.acceptedItemCount(shNode.GetSceneItemID()), 5)
+      self.assertEqual(shProxyModel.acceptedItemCount(shNode.GetSceneItemID()), 4)
       filteredObject.includeNodeAttributeNamesFilter = []
       filteredObject.excludeNodeAttributeNamesFilter = []
       self.assertEqual(shProxyModel.acceptedItemCount(shNode.GetSceneItemID()), 9)
@@ -541,7 +542,7 @@ class SubjectHierarchyGenericSelfTestTest(ScriptedLoadableModuleTest):
 
       # Check attribute filtering with class name and attribute value
       filteredObject.addNodeAttributeFilter('Markups.MovingMarkupIndex', 3, True, 'vtkMRMLMarkupsCurveNode')
-      self.assertEqual(shProxyModel.acceptedItemCount(shNode.GetSceneItemID()), 4)
+      self.assertEqual(shProxyModel.acceptedItemCount(shNode.GetSceneItemID()), 3)
       filteredObject.addNodeAttributeFilter('ParentAttribute', '', True, 'vtkMRMLMarkupsAngleNode')
       self.assertEqual(shProxyModel.acceptedItemCount(shNode.GetSceneItemID()), 5)
       filteredObject.addNodeAttributeFilter('ChildAttribute', '', True, 'vtkMRMLMarkupsAngleNode')
@@ -550,7 +551,7 @@ class SubjectHierarchyGenericSelfTestTest(ScriptedLoadableModuleTest):
       self.assertEqual(shProxyModel.acceptedItemCount(shNode.GetSceneItemID()), 9)
       # Check with empty attribute value
       filteredObject.addNodeAttributeFilter('Markups.MovingMarkupIndex', '', True, 'vtkMRMLMarkupsCurveNode')
-      self.assertEqual(shProxyModel.acceptedItemCount(shNode.GetSceneItemID()), 5)
+      self.assertEqual(shProxyModel.acceptedItemCount(shNode.GetSceneItemID()), 4)
       filteredObject.includeNodeAttributeNamesFilter = []
       self.assertEqual(shProxyModel.acceptedItemCount(shNode.GetSceneItemID()), 9)
 
@@ -558,6 +559,43 @@ class SubjectHierarchyGenericSelfTestTest(ScriptedLoadableModuleTest):
     testAttributeFilters(shProxyModel, shProxyModel)
     logging.info('Test attribute filters on tree view')
     testAttributeFilters(shTreeView, shProxyModel)
+
+  # ------------------------------------------------------------------------------
+  def section_ComboboxFeatures(self):
+    self.delayDisplay("Combobox features",self.delayMs)
+
+    comboBox = slicer.qMRMLSubjectHierarchyComboBox()
+    comboBox.setMRMLScene(slicer.mrmlScene)
+    comboBox.show()
+
+    shNode = slicer.mrmlScene.GetSubjectHierarchyNode()
+    self.assertEqual(comboBox.sortFilterProxyModel().acceptedItemCount(shNode.GetSceneItemID()), 9)
+
+    # Enable None item, number of accepted SH items is the same (None does not have a corresponding accepted SH item)
+    comboBox.noneEnabled = True
+    self.assertEqual(comboBox.sortFilterProxyModel().acceptedItemCount(shNode.GetSceneItemID()), 9)
+
+    # Default text
+    self.assertEqual(comboBox.defaultText, 'Select subject hierarchy item')
+
+    # Select node, include parent names in current item text (when collapsed)
+    markupsCurve1ItemID = shNode.GetItemByName('MarkupsCurve_1')
+    comboBox.setCurrentItem(markupsCurve1ItemID)
+    self.assertEqual(comboBox.defaultText, 'NewFolder_1 / MarkupsCurve_1')
+
+    # Select None item
+    comboBox.setCurrentItem(0)
+    self.assertEqual(comboBox.defaultText, comboBox.noneDisplay)
+
+    # Do not show parent names in current item text
+    comboBox.showCurrentItemParents = False
+    comboBox.setCurrentItem(markupsCurve1ItemID)
+    self.assertEqual(comboBox.defaultText, 'MarkupsCurve_1')
+
+    # Change None item name
+    comboBox.noneDisplay = 'No selection'
+    comboBox.setCurrentItem(0)
+    self.assertEqual(comboBox.defaultText, comboBox.noneDisplay)
 
 
   # ------------------------------------------------------------------------------
