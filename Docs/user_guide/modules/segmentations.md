@@ -9,7 +9,7 @@ The Segmentations module manages segmentations. Each segmentation can contain mu
 - Create surface meshes from images for 3D printing
 - Editing of 3D closed surfaces
 
-Motivation, features, and details of the infrastructure are explained in [these slides](https://www.slicer.org/wiki/File:20160526_Segmentations.pdf) ([source](https://www.slicer.org/wiki/File:20160526_Segmentations.pptx)).
+Motivation, features, and details of the infrastructure are explained in paper *Cs. Pinter, A. Lasso, G. Fichtinger, "Polymorph segmentation representation for medical image computing", Computer Methods and Programs in Biomedicine, Volume 171, p19-26, 2019* ([pdf](http://perk.cs.queensu.ca/sites/perkd7.cs.queensu.ca/files/Pinter2019_Manuscript.pdf), [DOI](https://doi.org/10.1016/j.cmpb.2019.02.011)) and in presentation slides ([pdf](https://www.slicer.org/wiki/File:20160526_Segmentations.pdf), [pptx](https://www.slicer.org/wiki/File:20160526_Segmentations.pptx)).
 
 ## Use cases
 
@@ -101,11 +101,11 @@ Labelmap volumes can be created in any other formats by [exporting segmentation 
 
 ### Create new representation in segmentation (conversion)
 
-The supported representations are listed as rows in the Representations section. The already existing representations have a green tick, the master representation (that is the source of all conversions and the representation that can be edited) a gold star.
+The supported representations are listed in the Representations section. Existing representations are marked with a green tick, the master representation is marked with a gold star. The master representation is the editable (for example, in Segment Editor module) and it is the source of all conversions.
 
-To create a representation that is missing, click on the Create button in its row. If custom conversion path or parameters are to be used (reference grid for labelmaps, smoothing for surfaces, etc.), long-press the button and choose "Advanced create...". In the appearing window the available conversion paths are listed in a list, ordered by estimated time cost. After selecting the desired path, the involved parameters are listed in the bottom section of the window
-
-To re-convert an existing representation (to use different conversion path or parameters), click the Update button in their row.
+- To create a representation, click on the Create button in the corresponding row. To specify a custom conversion path or parameters (reference geometry for labelmaps, smoothing for surfaces, etc.), click the down-arrow button in the "Create" button and choose "Advanced create...", then choose a conversion path from the list at the top, and adjust the conversion parameters in the section at the bottom.
+- To update a representation (re-create from the master representation) using custom conversion path or parameters, click the "Update" button in the corresponding row.
+- To remove a representation, click the down-arrow button in the "Update" button then choose "Remove".
 
 ### Adjust how segments are displayed
 
@@ -114,7 +114,7 @@ To re-convert an existing representation (to use different conversion path or pa
 
 ### Managing segmentations using Python scripts
 
-See Script repository's [Segmentations section](https://www.slicer.org/wiki/Documentation/Nightly/ScriptRepository#Segmentations) for examples.
+See Script repository's [Segmentations section](../../developer_guide/script_repository.md#segmentations) for examples.
 
 ### DICOM export
 - The master representation is used when exporting into DICOM, therefore you need to select a master volume, create binary labelmap representation and set it as master
@@ -134,7 +134,7 @@ See Script repository's [Segmentations section](https://www.slicer.org/wiki/Docu
     - Slice intersection thickness
     - Representation in 3D/2D views: The representation to be shown in the 3D and 2D views. Useful if there are multiple representations available, for example if we want to show the closed surface in the 3D view but the labelmap in the slice views
 - Representations
-    - List of supported representations and related operations 
+    - List of supported representations and related operations
     - The already existing representations have a green tick, the master representation (that is the source of all conversions and the representation that can be edited) a gold star
     - The buttons in each row can be used to create, remove, update a representation
         - Advanced conversion is possible (to use the non-default path or conversion parameters) by long-pressing the Create or Update button
@@ -152,7 +152,7 @@ See Script repository's [Segmentations section](https://www.slicer.org/wiki/Docu
 - Special subject hierarchy features for segmentations
     - Create representation: Create the chosen representation using the default path
 - Special subject hierarchy features for segments
-    - Show only this segment: Useful if only one segment needs to be shown and there are many, so clicking the eye buttons woud take a long time
+    - Show only this segment: Useful if only one segment needs to be shown and there are many, so clicking the eye buttons would take a long time
     - Show all segments
 
 ## Tutorials
@@ -165,7 +165,7 @@ See Script repository's [Segmentations section](https://www.slicer.org/wiki/Docu
 - [vtkSegmentationCore on GitHub](https://github.com/Slicer/Slicer/tree/master/Libs/vtkSegmentationCore) (within Slicer)
 - [Segmentations Slicer module on GitHub](https://github.com/Slicer/Slicer/tree/master/Modules/Loadable/Segmentations)
 - [Segmentations Labs page](https://www.slicer.org/wiki/Documentation/Labs/Segmentations)
-- [Manipulation of segmentations from Python scripts - examples in script repository](https://www.slicer.org/wiki/Documentation/Nightly/ScriptRepository)
+- [Manipulation of segmentations from Python scripts - examples in script repository](../../developer_guide/script_repository.md#segmentations)
 
 ## Related modules
 

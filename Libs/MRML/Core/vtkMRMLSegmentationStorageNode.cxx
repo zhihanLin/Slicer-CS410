@@ -572,7 +572,7 @@ int vtkMRMLSegmentationStorageNode::ReadBinaryLabelmapRepresentation(vtkMRMLSegm
     std::string segmentationExtentString;
     if (this->GetSegmentationMetaDataFromDicitionary(segmentationExtentString, dictionary, KEY_SEGMENTATION_EXTENT))
       {
-      // Legacy format. Return and read using ReadBinaryLabelmapRepresentation4DSpatial if availiable.
+      // Legacy format. Return and read using ReadBinaryLabelmapRepresentation4DSpatial if available.
       return 0;
       }
 
@@ -677,6 +677,8 @@ int vtkMRMLSegmentationStorageNode::ReadBinaryLabelmapRepresentation(vtkMRMLSegm
 
     if (numberOfSegments == 0)
       {
+      // No segment metadata. We are loading from a plain volume (not seg.nrrd).
+
       currentBinaryLabelmap = vtkSmartPointer<vtkOrientedImageData>::New();
       extractComponents->SetComponents(frameIndex);
       padder->SetOutputWholeExtent(imageExtentInFile);
@@ -714,6 +716,10 @@ int vtkMRMLSegmentationStorageNode::ReadBinaryLabelmapRepresentation(vtkMRMLSegm
         currentSegment->AddRepresentation(vtkSegmentationConverter::GetBinaryLabelmapRepresentationName(), currentBinaryLabelmap);
         segments.push_back(currentSegment);
         }
+
+      // Set segmentation geometry from loaded image
+      std::string imageGeometryString = vtkSegmentationConverter::SerializeImageGeometry(currentBinaryLabelmap);
+      segmentation->SetConversionParameter(vtkSegmentationConverter::GetReferenceImageGeometryParameterName(), imageGeometryString);
       }
     else
       {
@@ -939,7 +945,7 @@ int vtkMRMLSegmentationStorageNode::ReadPolyDataRepresentation(vtkMRMLSegmentati
 
   MRMLNodeModifyBlocker blocker(segmentationNode);
 
-  // Read segment poly datas
+  // Read segment poly data
   std::string masterRepresentationName;
   std::string containedRepresentationNames;
   std::string conversionParameters;

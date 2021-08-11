@@ -39,6 +39,7 @@
 #include <ctkUtils.h>
 
 // qRestAPI includes
+#include <qGirderAPI.h>
 #include <qMidasAPI.h>
 #include <qRestAPI.h>
 #include <qRestResult.h>
@@ -208,7 +209,7 @@ public:
 #ifdef Slicer_USE_PYTHONQT
   QStringList extensionPythonPaths(const QString& extensionName)const;
 #endif
-  static bool validateExtensionMetadata(const ExtensionMetadataType &extensionMetadata);
+  static bool validateExtensionMetadata(const ExtensionMetadataType &extensionMetadata, int serverAPI);
 
   static QStringList isExtensionCompatible(
       const ExtensionMetadataType& metadata, const QString& slicerRevision,
@@ -779,13 +780,42 @@ QStringList qSlicerExtensionsManagerModelPrivate::extensionPythonPaths(const QSt
 
 // --------------------------------------------------------------------------
 bool qSlicerExtensionsManagerModelPrivate::validateExtensionMetadata(
-    const ExtensionMetadataType &extensionMetadata)
+    const ExtensionMetadataType &extensionMetadata, int serverAPI)
 {
   bool valid = true;
   QStringList expectedNonEmptyKeys;
-  foreach(const QString& key, QStringList()
-          << "productname"  << "name" << "item_id"
-          )
+  if (serverAPI == qSlicerExtensionsManagerModel::Midas_v1)
+    {
+    expectedNonEmptyKeys
+        << "item_id"
+        << "name"
+        << "productname";
+    }
+  else if (serverAPI == qSlicerExtensionsManagerModel::Girder_v1)
+    {
+    expectedNonEmptyKeys
+        << "_id"
+        << "meta.app_id"
+        << "meta.app_revision"
+        << "meta.arch"
+        << "meta.baseName"
+        << "meta.category"
+        << "meta.description"
+        << "meta.homepage"
+        << "meta.icon_url"
+        << "meta.os"
+        << "meta.repository_type"
+        << "meta.repository_url"
+        << "meta.revision"
+//        << "meta.screenshots"
+        << "name";
+    }
+  else
+    {
+    qWarning() << Q_FUNC_INFO << " failed: missing implementation for serverAPI" << serverAPI;
+    return false;
+    }
+  foreach(const QString& key, expectedNonEmptyKeys)
     {
     valid = valid && !extensionMetadata.value(key).toString().isEmpty();
     }
@@ -951,10 +981,25 @@ QVariantMap qSlicerExtensionsManagerModelPrivate::getExtensionsInfoFromPreviousI
       if (!q->isExtensionInstalled(extensionName))
         {
         qRestAPI::Parameters parameters;
-        parameters["productname"] = extensionName;
-        parameters["slicer_revision"] = q->slicerRevision();
-        parameters["os"] = q->slicerOs();
-        parameters["arch"] = q->slicerArch();
+        if (q->serverAPI() == qSlicerExtensionsManagerModel::Midas_v1)
+          {
+          parameters["productname"] = extensionName;
+          parameters["slicer_revision"] = q->slicerRevision();
+          parameters["os"] = q->slicerOs();
+          parameters["arch"] = q->slicerArch();
+          }
+        else if (q->serverAPI() == qSlicerExtensionsManagerModel::Girder_v1)
+          {
+          parameters["extension_name"] = extensionName;
+          parameters["app_revision"] = q->slicerRevision();
+          parameters["os"] = q->slicerOs();
+          parameters["arch"] = q->slicerArch();
+          }
+        else
+          {
+          qWarning() << Q_FUNC_INFO << " failed: missing implementation for serverAPI" << q->serverAPI();
+          return extensionsHistoryInformation;
+          }
         const ExtensionMetadataType& metaData = retrieveExtensionMetadata(parameters);
         description = metaData.value("description").toString();
         extensionId = metaData.value("extension_id").toString();     //retrieve updated extension id for not installed extensions
@@ -1009,11 +1054,26 @@ qSlicerExtensionsManagerModel::ExtensionMetadataType qSlicerExtensionsManagerMod
     }
   else
     {
-    this->GetExtensionMetadataApi.setServerUrl(q->serverUrl().toString() + "/api/json");
     int maxWaitingTimeInMSecs = 2500;
     this->GetExtensionMetadataApi.setTimeOut(maxWaitingTimeInMSecs);
     qRestAPI::Parameters queryParameters = parameters;
-    queryParameters["method"] = "midas.slicerpackages.extension.list";
+    if (q->serverAPI() == qSlicerExtensionsManagerModel::Midas_v1)
+      {
+      this->GetExtensionMetadataApi.setServerUrl(q->serverUrl().toString() + "/api/json");
+      queryParameters["method"] = "midas.slicerpackages.extension.list";
+      }
+    else if (q->serverAPI() == qSlicerExtensionsManagerModel::Girder_v1)
+      {
+      QUrl url = q->serverUrl().toString();
+      QString appID = "5f4474d0e1d8c75dfc705482";
+      url.setPath(url.path() + QString("/api/v1/app/%1/extension").arg(appID));
+      this->GetExtensionMetadataApi.setServerUrl(url.toString());
+      }
+    else
+      {
+      qWarning() << Q_FUNC_INFO << " failed: missing implementation for serverAPI" << q->serverAPI();
+      return ExtensionMetadataType();
+      }
     QUuid queryUuid = this->GetExtensionMetadataApi.get("", queryParameters);
 
     QScopedPointer<qRestResult> restResult(this->GetExtensionMetadataApi.takeResult(queryUuid));
@@ -1021,7 +1081,14 @@ qSlicerExtensionsManagerModel::ExtensionMetadataType qSlicerExtensionsManagerMod
     QString errorText; // if any error occurs then this will be set to non-empty
     if(restResult)
       {
-      qMidasAPI::parseMidasResponse(restResult.data(), restResult->response());
+      if (q->serverAPI() == qSlicerExtensionsManagerModel::Midas_v1)
+        {
+        qMidasAPI::parseMidasResponse(restResult.data(), restResult->response());
+        }
+      else if (q->serverAPI() == qSlicerExtensionsManagerModel::Girder_v1)
+        {
+        qGirderAPI::parseGirderAPIv1Response(restResult.data(), restResult->response());
+        }
 
       QList<QVariantMap> results = restResult->results();
       // extension manager returned OK
@@ -1034,8 +1101,8 @@ qSlicerExtensionsManagerModel::ExtensionMetadataType qSlicerExtensionsManagerMod
       else if (results.count() == 1)
         {
         // extension manager returned 1 result, we can use this
-        result = results.at(0);
-        if (!qSlicerExtensionsManagerModelPrivate::validateExtensionMetadata(result))
+        result = qRestAPI::qVariantMapFlattened(results.at(0));
+        if (!qSlicerExtensionsManagerModelPrivate::validateExtensionMetadata(result, q->serverAPI()))
           {
           errorText = "invalid response received";
           }
@@ -1062,16 +1129,20 @@ qSlicerExtensionsManagerModel::ExtensionMetadataType qSlicerExtensionsManagerMod
       this->critical(QString("Error retrieving extension metadata: %1 (%2)")
         .arg(parameters.values().join(", "))
         .arg(errorText));
+      if (!result.isEmpty())
+        {
+        this->critical(QString("\nResponse:\n%1").arg(qRestAPI::qVariantToString(result)));
+        }
       return ExtensionMetadataType();
       }
     this->ServerResponseCache[serverResponseCacheKey] = result;
     }
 
-  ExtensionMetadataType updatedExtensionMetadata;
+  ExtensionMetadataType updatedExtensionMetadata = result;
   foreach(const QString& key, result.keys())
     {
     updatedExtensionMetadata.insert(
-      q->serverToExtensionDescriptionKey().value(key, key), result.value(key));
+      q->serverToExtensionDescriptionKey(q->serverAPI()).value(key, key), result.value(key));
     }
 
   return updatedExtensionMetadata;
@@ -1093,12 +1164,41 @@ qSlicerExtensionsManagerModel::qSlicerExtensionsManagerModel(QObject* _parent)
 qSlicerExtensionsManagerModel::~qSlicerExtensionsManagerModel() = default;
 
 // --------------------------------------------------------------------------
+int qSlicerExtensionsManagerModel::serverAPI() const
+{
+  QString serverApi = qEnvironmentVariable("SLICER_EXTENSIONS_MANAGER_SERVER_API", "Girder_v1");
+  if (serverApi == "Midas_v1")
+    {
+    return Self::Midas_v1;
+    }
+  else if (serverApi == "Girder_v1")
+    {
+    return Self::Girder_v1;
+    }
+  else
+    {
+    qWarning().noquote() << "Unknown value '" << serverApi << "' associated with SLICER_EXTENSIONS_MANAGER_SERVER_API env. variable. Using 'Midas_v1'";
+    return Self::Midas_v1;
+    }
+}
+
+// --------------------------------------------------------------------------
 QUrl qSlicerExtensionsManagerModel::serverUrl()const
 {
   QSettings settings(this->extensionsSettingsFilePath(), QSettings::IniFormat);
-  return QUrl(settings.value("Extensions/ServerUrl").toString());
-  //HS Uncomment the following line for debugging and comment above line.
-  //return QUrl("http://10.171.2.133:8080");
+  return QUrl(qEnvironmentVariable("SLICER_EXTENSIONS_MANAGER_SERVER_URL", settings.value("Extensions/ServerUrl").toString()));
+}
+
+// --------------------------------------------------------------------------
+QUrl qSlicerExtensionsManagerModel::frontendServerUrl()const
+{
+  QSettings settings(this->extensionsSettingsFilePath(), QSettings::IniFormat);
+  QString url = qEnvironmentVariable("SLICER_EXTENSIONS_MANAGER_FRONTEND_SERVER_URL", settings.value("Extensions/FrontendServerUrl").toString());
+  if (url.endsWith("/"))
+    {
+    url.chop(1);
+    }
+  return QUrl(url);
 }
 
 // --------------------------------------------------------------------------
@@ -1356,11 +1456,25 @@ qSlicerExtensionsManagerModel::ExtensionMetadataType qSlicerExtensionsManagerMod
     }
 
   qRestAPI::Parameters parameters;
-  parameters["productname"] = extensionName;
-  parameters["slicer_revision"] = this->slicerRevision();
-  parameters["os"] = this->slicerOs();
-  parameters["arch"] = this->slicerArch();
-
+  if (this->serverAPI() == Self::Midas_v1)
+    {
+    parameters["productname"] = extensionName;
+    parameters["slicer_revision"] = this->slicerRevision();
+    parameters["os"] = this->slicerOs();
+    parameters["arch"] = this->slicerArch();
+    }
+  else if (this->serverAPI() == Self::Girder_v1)
+    {
+    parameters["extension_name"] = extensionName;
+    parameters["app_revision"] = this->slicerRevision();
+    parameters["os"] = this->slicerOs();
+    parameters["arch"] = this->slicerArch();
+    }
+  else
+    {
+    qWarning() << Q_FUNC_INFO << " failed: missing implementation for serverAPI" << this->serverAPI();
+    return ExtensionMetadataType();
+    }
   return d->retrieveExtensionMetadata(parameters);
 }
 
@@ -1378,15 +1492,64 @@ qSlicerExtensionsManagerModelPrivate::downloadExtension(
     return nullptr;
     }
 
-  QString itemId = extensionMetadata["item_id"].toString();
-
-  this->debug(QString("Downloading extension [ itemId: %1]").arg(itemId));
   QUrl downloadUrl(q->serverUrl());
-  downloadUrl.setPath(downloadUrl.path() + "/download");
-  QUrlQuery urlQuery;
-  urlQuery.setQueryItems(
-        QList<QPair<QString, QString> >() << QPair<QString, QString>("items", itemId));
-  downloadUrl.setQuery(urlQuery);
+
+  if (q->serverAPI() == qSlicerExtensionsManagerModel::Midas_v1)
+    {
+    QString itemId = extensionMetadata["item_id"].toString();
+
+    this->debug(QString("Downloading extension [ itemId: %1]").arg(itemId));
+    downloadUrl.setPath(downloadUrl.path() + "/download");
+    QUrlQuery urlQuery;
+    urlQuery.setQueryItems(
+          QList<QPair<QString, QString> >() << QPair<QString, QString>("items", itemId));
+    downloadUrl.setQuery(urlQuery);
+    }
+  else if (q->serverAPI() == qSlicerExtensionsManagerModel::Girder_v1)
+    {
+    QString item_id = extensionMetadata["_id"].toString();
+
+    // Retrieve file_id associated with the item
+    QString file_id;
+
+    this->debug(QString("Retrieving extension files [ extensionId: %1 ]").arg(item_id));
+    qRestAPI getItemFilesApi;
+    getItemFilesApi.setServerUrl(q->serverUrl().toString() + QString("/api/v1/item/%1/files").arg(item_id));
+    const QUuid& queryUuid = getItemFilesApi.get("");
+    QScopedPointer<qRestResult> restResult(getItemFilesApi.takeResult(queryUuid));
+    if(restResult)
+      {
+      qGirderAPI::parseGirderAPIv1Response(restResult.data(), restResult->response());
+      QList<QVariantMap> results = restResult->results();
+      if (results.isEmpty())
+        {
+        // extension manager returned 0 file, this is not expected
+        return nullptr;
+        }
+      else if (results.count() == 1)
+        {
+        file_id = results.at(0).value("_id").toString();
+        }
+      else
+        {
+        // extension manager returned multiple files, this is not expected, do not use the results
+        return nullptr;
+        }
+      }
+
+    if (file_id.isEmpty())
+      {
+      return nullptr;
+      }
+
+    this->debug(QString("Downloading extension [ item_id: %1, file_id: %2]").arg(item_id).arg(file_id));
+    downloadUrl.setPath(downloadUrl.path() + QString("/api/v1/file/%1/download").arg(file_id));
+    }
+  else
+    {
+    qWarning() << Q_FUNC_INFO << " failed: missing implementation for serverAPI" << q->serverAPI();
+    return nullptr;
+    }
 
   QNetworkReply* const reply =
     this->NetworkManager.get(QNetworkRequest(downloadUrl));
@@ -1513,6 +1676,7 @@ bool qSlicerExtensionsManagerModel::installExtension(
 
   if (extensionName.isEmpty())
     {
+    d->critical("installExtension: extensionName is not set !");
     return false;
     }
 
@@ -1604,10 +1768,24 @@ bool qSlicerExtensionsManagerModel::installExtension(
         }
 
       qRestAPI::Parameters parameters;
-      parameters["productname"] = dependencyName;
-      parameters["slicer_revision"] = this->slicerRevision();
-      parameters["os"] = this->slicerOs();
-      parameters["arch"] = this->slicerArch();
+      if (this->serverAPI() == Self::Midas_v1)
+        {
+        parameters["productname"] = dependencyName;
+        parameters["slicer_revision"] = this->slicerRevision();
+        parameters["os"] = this->slicerOs();
+        parameters["arch"] = this->slicerArch();
+        }
+      else if (this->serverAPI() == Self::Girder_v1)
+        {
+        parameters["extension_name"] = dependencyName;
+        parameters["app_revision"] = this->slicerRevision();
+        parameters["os"] = this->slicerOs();
+        parameters["arch"] = this->slicerArch();
+        }
+      else
+        {
+        qWarning() << Q_FUNC_INFO << " failed: missing implementation for serverAPI" << this->serverAPI();
+        }
 
       const ExtensionMetadataType& dependencyMetadata =
         d->retrieveExtensionMetadata(parameters);
@@ -1699,7 +1877,20 @@ void qSlicerExtensionsManagerModel::checkForUpdates(bool installUpdates)
 {
   Q_D(qSlicerExtensionsManagerModel);
 
-  d->CheckForUpdatesApi.setServerUrl(this->serverUrl().toString() + "/api/json");
+  if (this->serverAPI() == qSlicerExtensionsManagerModel::Midas_v1)
+    {
+    d->CheckForUpdatesApi.setServerUrl(this->serverUrl().toString() + "/api/json");
+    }
+  else if (this->serverAPI() == qSlicerExtensionsManagerModel::Girder_v1)
+    {
+    QString appID = "5f4474d0e1d8c75dfc705482";
+    d->CheckForUpdatesApi.setServerUrl(this->serverUrl().toString() + QString("/api/v1/app/%1/extension").arg(appID));
+    }
+  else
+    {
+    qWarning() << Q_FUNC_INFO << " failed: missing implementation for serverAPI" << this->serverAPI();
+    return;
+    }
 
   // Loop over extensions
   foreach (const QString& extensionName, this->installedExtensions())
@@ -1717,14 +1908,33 @@ void qSlicerExtensionsManagerModel::checkForUpdates(bool installUpdates)
       }
     else
       {
-      parameters["productname"] = extensionName;
-      parameters["slicer_revision"] = this->slicerRevision();
-      parameters["os"] = this->slicerOs();
-      parameters["arch"] = this->slicerArch();
+      qRestAPI::Parameters parameters;
+      if (this->serverAPI() == Self::Midas_v1)
+        {
+        parameters["productname"] = extensionName;
+        parameters["slicer_revision"] = this->slicerRevision();
+        parameters["os"] = this->slicerOs();
+        parameters["arch"] = this->slicerArch();
+        }
+      else if (this->serverAPI() == Self::Girder_v1)
+        {
+        parameters["extension_name"] = extensionName;
+        parameters["app_revision"] = this->slicerRevision();
+        parameters["os"] = this->slicerOs();
+        parameters["arch"] = this->slicerArch();
+        }
+      else
+        {
+        qWarning() << Q_FUNC_INFO << " failed: missing implementation for serverAPI" << this->serverAPI();
+        return;
+        }
       }
 
     // Issue the query
-    parameters["method"] = "midas.slicerpackages.extension.list";
+    if (this->serverAPI() == Self::Midas_v1)
+      {
+      parameters["method"] = "midas.slicerpackages.extension.list";
+      }
     const QUuid& requestId =
       d->CheckForUpdatesApi.get("", parameters);
 
@@ -2465,33 +2675,69 @@ const QStandardItemModel * qSlicerExtensionsManagerModel::model()const
 }
 
 // --------------------------------------------------------------------------
-QHash<QString, QString> qSlicerExtensionsManagerModel::serverToExtensionDescriptionKey()
+QHash<QString, QString> qSlicerExtensionsManagerModel::serverToExtensionDescriptionKey(int serverAPI)
 {
   QHash<QString, QString> serverToExtensionDescriptionKey;
-  serverToExtensionDescriptionKey.insert("productname", "extensionname");
-  serverToExtensionDescriptionKey.insert("name", "archivename");
-  serverToExtensionDescriptionKey.insert("repository_type", "scm");
-  serverToExtensionDescriptionKey.insert("repository_url", "scmurl");
-  serverToExtensionDescriptionKey.insert("development_status", "status");
-  serverToExtensionDescriptionKey.insert("icon_url", "iconurl");
+  if (serverAPI == Self::Midas_v1)
+    {
+    serverToExtensionDescriptionKey.insert("productname", "extensionname");
+    serverToExtensionDescriptionKey.insert("name", "archivename");
+    serverToExtensionDescriptionKey.insert("repository_type", "scm");
+    serverToExtensionDescriptionKey.insert("repository_url", "scmurl");
+    serverToExtensionDescriptionKey.insert("development_status", "status");
+    serverToExtensionDescriptionKey.insert("icon_url", "iconurl");
+    }
+  else if (serverAPI == Self::Girder_v1)
+    {
+    serverToExtensionDescriptionKey.insert("_id", "extension_id");
+    serverToExtensionDescriptionKey.insert("meta.baseName", "extensionname");
+    serverToExtensionDescriptionKey.insert("meta.repository_type", "scm");
+    serverToExtensionDescriptionKey.insert("meta.repository_url", "scmurl");
+    //serverToExtensionDescriptionKey.insert("development_status", "status");
+    serverToExtensionDescriptionKey.insert("meta.icon_url", "iconurl");
+    serverToExtensionDescriptionKey.insert("name", "archivename");
+    }
+  else
+    {
+    qWarning() << Q_FUNC_INFO << " failed: missing implementation for serverAPI" << serverAPI;
+    }
   return serverToExtensionDescriptionKey;
 }
 
 // --------------------------------------------------------------------------
-QStringList qSlicerExtensionsManagerModel::serverKeysToIgnore()
+QStringList qSlicerExtensionsManagerModel::serverKeysToIgnore(int serverAPI)
 {
-  return QStringList()
-      << "item_id" << "bitstream_id"
-      << "submissiontype" << "codebase" << "package"
-      << "size" << "date_creation";
+  if (serverAPI == Self::Midas_v1)
+    {
+    return QStringList()
+        << "item_id" << "bitstream_id"
+        << "submissiontype" << "codebase" << "package"
+        << "size" << "date_creation";
+    }
+  else if (serverAPI == Self::Girder_v1)
+    {
+    return QStringList()
+        << "baseParentId"
+        << "baseParentType"
+        << "created"
+        << "creatorId"
+        << "folderId"
+        << "size"
+        << "updated";
+    }
+  else
+    {
+    qWarning() << Q_FUNC_INFO << " failed: missing implementation for serverAPI" << serverAPI;
+    return QStringList();
+    }
 }
 
 // --------------------------------------------------------------------------
 qSlicerExtensionsManagerModel::ExtensionMetadataType
-qSlicerExtensionsManagerModel::filterExtensionMetadata(const ExtensionMetadataType& extensionMetadata)
+qSlicerExtensionsManagerModel::filterExtensionMetadata(const ExtensionMetadataType& extensionMetadata, int serverAPI)
 {
   ExtensionMetadataType filteredExtensionMetadata = extensionMetadata;
-  foreach(const QString& key, Self::serverKeysToIgnore())
+  foreach(const QString& key, Self::serverKeysToIgnore(serverAPI))
     {
     filteredExtensionMetadata.remove(key);
     }

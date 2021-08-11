@@ -539,7 +539,21 @@ void qSlicerExtensionsManageWidgetPrivate::addExtensionItem(const ExtensionMetad
   bool isExtensionCompatible =
       q->extensionsManagerModel()->isExtensionCompatible(extensionName).isEmpty();
 
-  QString moreLinkTarget = QString("slicer:%1").arg(extensionId);
+  QString moreLinkTarget;
+  int serverAPI = q->extensionsManagerModel()->serverAPI();
+  if (serverAPI == qSlicerExtensionsManagerModel::Midas_v1)
+    {
+    moreLinkTarget = QString("slicer:%1").arg(extensionId);
+    }
+  else if (serverAPI == qSlicerExtensionsManagerModel::Girder_v1)
+    {
+     moreLinkTarget = QString("slicer:%1").arg(extensionName);
+    }
+  else
+    {
+    qWarning() << Q_FUNC_INFO << " failed: missing implementation for serverAPI" << serverAPI;
+    }
+
   qSlicerExtensionsDescriptionLabel * label = new qSlicerExtensionsDescriptionLabel(
         extensionSlicerRevision, q->extensionsManagerModel()->slicerRevision(),
         moreLinkTarget, extensionName, description, enabled, isExtensionCompatible);
@@ -906,13 +920,30 @@ void qSlicerExtensionsManageWidget::onLinkActivated(const QString& link)
 {
   Q_D(qSlicerExtensionsManageWidget);
 
-  QUrl url = d->ExtensionsManagerModel->serverUrl();
-  url.setPath(url.path() + "/slicerappstore/extension/view");
-  QUrlQuery urlQuery;
-  urlQuery.addQueryItem("extensionId", link.mid(7)); // remove leading "slicer:"
-  urlQuery.addQueryItem("breadcrumbs", "none");
-  urlQuery.addQueryItem("layout", "empty");
-  url.setQuery(urlQuery);
+  QUrl url = d->ExtensionsManagerModel->frontendServerUrl();
+  int serverAPI = this->extensionsManagerModel()->serverAPI();
+  if (serverAPI == qSlicerExtensionsManagerModel::Midas_v1)
+    {
+    url.setPath(url.path() + "/extension/view");
+    QUrlQuery urlQuery;
+    urlQuery.addQueryItem("extensionId", link.mid(7)); // remove leading "slicer:"
+    urlQuery.addQueryItem("breadcrumbs", "none");
+    urlQuery.addQueryItem("layout", "empty");
+    url.setQuery(urlQuery);
+    }
+  else if (serverAPI == qSlicerExtensionsManagerModel::Girder_v1)
+    {
+    QString extensionName = link.mid(7); // remove leading "slicer:"
+    url.setPath(url.path() + QString("/view/%1/%2/%3")
+                .arg(extensionName)
+                .arg(this->extensionsManagerModel()->slicerRevision())
+                .arg(this->extensionsManagerModel()->slicerOs()));
+    }
+  else
+    {
+    qWarning() << Q_FUNC_INFO << " failed: missing implementation for serverAPI" << serverAPI;
+    return;
+    }
 
   emit this->linkActivated(url);
 }

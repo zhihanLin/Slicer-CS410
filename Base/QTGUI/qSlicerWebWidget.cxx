@@ -67,7 +67,8 @@ public:
 // --------------------------------------------------------------------------
 qSlicerWebEnginePage::qSlicerWebEnginePage(QWebEngineProfile *profile, QObject *parent)
   : QWebEnginePage(profile, parent),
-    WebWidget(nullptr)
+    WebWidget(nullptr),
+    JavaScriptConsoleMessageLoggingEnabled(false)
 {
 }
 
@@ -115,6 +116,7 @@ void qSlicerWebWidgetPrivate::init()
   this->initializeWebEngineProfile(profile);
 
   this->WebEnginePage = new qSlicerWebEnginePage(profile, this->WebView);
+  this->WebEnginePage->JavaScriptConsoleMessageLoggingEnabled = developerModeEnabled;
   this->WebEnginePage->WebWidget = q;
   this->WebView->setPage(this->WebEnginePage);
 
@@ -288,6 +290,20 @@ void qSlicerWebWidget::setInternalHosts(const QStringList& hosts)
 }
 
 // --------------------------------------------------------------------------
+bool qSlicerWebWidget::javaScriptConsoleMessageLoggingEnabled() const
+{
+  Q_D(const qSlicerWebWidget);
+  return d->WebEnginePage->JavaScriptConsoleMessageLoggingEnabled;
+}
+
+// --------------------------------------------------------------------------
+void qSlicerWebWidget::setJavaScriptConsoleMessageLoggingEnabled(bool enable)
+{
+  Q_D(qSlicerWebWidget);
+  d->WebEnginePage->JavaScriptConsoleMessageLoggingEnabled = enable;
+}
+
+// --------------------------------------------------------------------------
 QWebEngineView *
 qSlicerWebWidget::webView()
 {
@@ -388,6 +404,13 @@ void qSlicerWebWidget::printToPdf(const QString& filePath)
 {
   Q_D(qSlicerWebWidget);
   d->WebEnginePage->printToPdf(filePath);
+}
+
+// --------------------------------------------------------------------------
+void qSlicerWebWidget::printToPdf(const QString& filePath, const QPageLayout& pageLayout)
+{
+    Q_D(qSlicerWebWidget);
+    d->WebEnginePage->printToPdf(filePath, pageLayout);
 }
 
 // --------------------------------------------------------------------------

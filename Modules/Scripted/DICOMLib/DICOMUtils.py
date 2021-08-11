@@ -166,7 +166,43 @@ def loadSeriesByUID(seriesUIDs):
     return []
 
   loadablesByPlugin, loadEnabled = getLoadablesFromFileLists(fileLists)
+  selectHighestConfidenceLoadables(loadablesByPlugin)
   return loadLoadables(loadablesByPlugin)
+
+def selectHighestConfidenceLoadables(loadablesByPlugin):
+  """Review the selected state and confidence of the loadables
+  across plugins so that the options the user is most likely
+  to want are listed at the top of the table and are selected
+  by default. Only offer one pre-selected loadable per series
+  unless both plugins mark it as selected and they have equal
+  confidence."""
+
+  # first, get all loadables corresponding to a series
+  seriesUIDTag = "0020,000E"
+  loadablesBySeries = {}
+  for plugin in loadablesByPlugin:
+    for loadable in loadablesByPlugin[plugin]:
+      seriesUID = slicer.dicomDatabase.fileValue(loadable.files[0], seriesUIDTag)
+      if seriesUID not in loadablesBySeries:
+        loadablesBySeries[seriesUID] = [loadable]
+      else:
+        loadablesBySeries[seriesUID].append(loadable)
+
+  # now for each series, find the highest confidence selected loadables
+  # and set all others to be unselected.
+  # If there are several loadables that tie for the
+  # highest confidence value, select them all
+  # on the assumption that they represent alternate interpretations
+  # of the data or subparts of it.  The user can either use
+  # advanced mode to deselect, or simply delete the
+  # unwanted interpretations.
+  for series in loadablesBySeries:
+    highestConfidenceValue = -1
+    for loadable in loadablesBySeries[series]:
+      if loadable.confidence > highestConfidenceValue:
+        highestConfidenceValue = loadable.confidence
+    for loadable in loadablesBySeries[series]:
+      loadable.selected = loadable.confidence == highestConfidenceValue
 
 #------------------------------------------------------------------------------
 def loadByInstanceUID(instanceUID):
@@ -305,7 +341,7 @@ def closeTemporaryDatabase(originalDatabaseDir, cleanup=True):
   settings = qt.QSettings()
   settings.setValue(slicer.dicomDatabaseDirectorySettingsKey, originalDatabaseDir)
 
-  # Attempt to re-open orginal database only if it exists
+  # Attempt to re-open original database only if it exists
   if os.access(originalDatabaseDir, os.F_OK):
     success = openDatabase(originalDatabaseDir)
     if not success:
@@ -349,14 +385,13 @@ def deleteTemporaryDatabase(dicomDatabase, cleanup=True):
   dicomDatabase.closeDatabase()
 
   if cleanup:
-    dicomDatabase.initializeDatabase()
-    # TODO: The database files cannot be deleted even if the database is closed.
-    #       Not critical, as it will be empty, so will not take measurable disk space.
-    # import shutil
-    # databaseDir = os.path.split(dicomDatabase.databaseFilename)[0]
-    # shutil.rmtree(databaseDir)
-    # if os.access(databaseDir, os.F_OK):
-      # logging.error('Failed to delete DICOM database ' + databaseDir)
+    import shutil
+    databaseDir = os.path.split(dicomDatabase.databaseFilename)[0]
+    shutil.rmtree(databaseDir)
+    if os.access(databaseDir, os.F_OK):
+      logging.error('Failed to delete DICOM database ' + databaseDir)
+      # Database is still in use, at least clear its content
+      dicomDatabase.initializeDatabase()
 
   return True
 

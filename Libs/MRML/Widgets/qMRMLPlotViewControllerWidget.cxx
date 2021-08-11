@@ -37,7 +37,6 @@
 #include <vtkTable.h>
 
 // CTK includes
-#include <ctkLogger.h>
 #include <ctkPopupWidget.h>
 
 // qMRML includes
@@ -59,10 +58,6 @@
 
 // STD include
 #include <string>
-
-//--------------------------------------------------------------------------
-static ctkLogger logger("org.slicer.libs.qmrmlwidgets.qMRMLPlotViewControllerWidget");
-//--------------------------------------------------------------------------
 
 //--------------------------------------------------------------------------
 // qMRMLPlotViewControllerWidgetPrivate methods
@@ -100,7 +95,7 @@ void qMRMLPlotViewControllerWidgetPrivate::setupPopupUi()
   this->connect(this->interactionModeComboBox, SIGNAL(currentIndexChanged(int)), SLOT(onInteractionModeChanged(int)));
   QObject::connect(this->actionFit_to_window, SIGNAL(triggered()), q, SLOT(fitPlotToAxes()));
 
-  QObject::connect(this->savePushButton, SIGNAL(clicked()), q, SLOT(onSaveButton()));
+  QObject::connect(this->exportPushButton, SIGNAL(clicked()), q, SLOT(onExportButton()));
 
   // Connect the scene
   QObject::connect(q, SIGNAL(mrmlSceneChanged(vtkMRMLScene*)), this->plotChartComboBox, SLOT(setMRMLScene(vtkMRMLScene*)));
@@ -281,19 +276,25 @@ void qMRMLPlotViewControllerWidget::setPlotView(qMRMLPlotView* view)
 void qMRMLPlotViewControllerWidget::setViewLabel(const QString& newViewLabel)
 {
   Q_D(qMRMLPlotViewControllerWidget);
-
-  if (d->PlotViewNode)
+  if (!d->PlotViewNode)
     {
-    logger.error("setViewLabel should be called before setViewNode !");
+    qCritical() << Q_FUNC_INFO << " failed: must set view node first";
     return;
     }
-
-  d->PlotViewLabel = newViewLabel;
-  d->ViewLabel->setText(d->PlotViewLabel);
+  d->PlotViewNode->SetLayoutLabel(newViewLabel.toUtf8());
 }
 
 //---------------------------------------------------------------------------
-CTK_GET_CPP(qMRMLPlotViewControllerWidget, QString, viewLabel, PlotViewLabel);
+QString qMRMLPlotViewControllerWidget::viewLabel()const
+{
+  Q_D(const qMRMLPlotViewControllerWidget);
+  if (!d->PlotViewNode)
+    {
+    qCritical() << Q_FUNC_INFO << " failed: must set view node first";
+    return QString();
+    }
+  return d->PlotViewNode->GetLayoutLabel();
+}
 
 
 //---------------------------------------------------------------------------
@@ -319,7 +320,7 @@ void qMRMLPlotViewControllerWidget::fitPlotToAxes()
 }
 
 //---------------------------------------------------------------------------
-void qMRMLPlotViewControllerWidget::onSaveButton()
+void qMRMLPlotViewControllerWidget::onExportButton()
 {
   Q_D(qMRMLPlotViewControllerWidget);
   if(!d->PlotView || !d->PlotViewNode)
@@ -339,9 +340,7 @@ void qMRMLPlotViewControllerWidget::onSaveButton()
     name, tr("Scalable Vector Graphics (*.svg)"));
   if (!fileName.isEmpty())
     {
-    QFileInfo fileInfo(fileName);
-    QString filePathPrefix = fileInfo.absoluteFilePath() + "/" + fileInfo.completeBaseName();
-    d->PlotView->saveAsSVG(filePathPrefix);
+    d->PlotView->saveAsSVG(fileName);
     }
 }
 
@@ -355,7 +354,7 @@ void qMRMLPlotViewControllerWidget::updateWidgetFromMRML()
     return;
     }
 
-  this->setViewLabel(d->PlotViewNode->GetLayoutLabel());
+  d->ViewLabel->setText(d->PlotViewNode->GetLayoutLabel());
 
   // PlotChartNode selector
   vtkMRMLPlotChartNode* mrmlPlotChartNode = d->GetPlotChartNodeFromView();
@@ -392,27 +391,16 @@ void qMRMLPlotViewControllerWidget::updateWidgetFromMRML()
 
   // Plot series selector
   bool plotBlockSignals = d->plotSeriesComboBox->blockSignals(true);
-
   for (int idx = 0; idx < d->plotSeriesComboBox->nodeCount(); idx++)
     {
-    vtkMRMLNode* node = d->plotSeriesComboBox->nodeFromIndex(idx);
-    d->plotSeriesComboBox->setCheckState(node, Qt::Unchecked);
-    }
-
-  std::vector<std::string> plotSeriesNodesIDs;
-  mrmlPlotChartNode->GetPlotSeriesNodeIDs(plotSeriesNodesIDs);
-  for (std::vector<std::string>::iterator it = plotSeriesNodesIDs.begin();
-    it != plotSeriesNodesIDs.end(); ++it)
-    {
-    vtkMRMLPlotSeriesNode *plotSeriesNode = vtkMRMLPlotSeriesNode::SafeDownCast
-      (this->mrmlScene()->GetNodeByID((*it).c_str()));
-    if (plotSeriesNode == nullptr)
+    vtkMRMLNode* plotSeriesNode = d->plotSeriesComboBox->nodeFromIndex(idx);
+    Qt::CheckState checkState = Qt::Unchecked;
+    if (plotSeriesNode && mrmlPlotChartNode->HasPlotSeriesNodeID(plotSeriesNode->GetID()))
       {
-      continue;
+      checkState = Qt::Checked;
       }
-    d->plotSeriesComboBox->setCheckState(plotSeriesNode, Qt::Checked);
+    d->plotSeriesComboBox->setCheckState(plotSeriesNode, checkState);
     }
-
   d->plotSeriesComboBox->blockSignals(plotBlockSignals);
 
   d->actionShow_Grid->setChecked(mrmlPlotChartNode->GetGridVisibility());

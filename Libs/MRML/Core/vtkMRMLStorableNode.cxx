@@ -34,9 +34,9 @@ vtkMRMLStorableNode::vtkMRMLStorableNode()
 {
   this->UserTagTable = vtkTagTable::New();
   this->SlicerDataType = "";
+  this->DefaultSequenceStorageNodeClassName = "vtkMRMLSequenceStorageNode";
   this->AddNodeReferenceRole(this->GetStorageNodeReferenceRole(),
                              this->GetStorageNodeReferenceMRMLAttributeName());
-
 }
 
 //----------------------------------------------------------------------------
@@ -210,6 +210,19 @@ void vtkMRMLStorableNode::ReadXMLAttributes(const char** atts)
 }
 
 //----------------------------------------------------------------------------
+void vtkMRMLStorableNode::Copy(vtkMRMLNode* anode)
+{
+  Superclass::Copy(anode);
+  vtkMRMLStorableNode *node = (vtkMRMLStorableNode *) anode;
+  if (!node)
+    {
+    return;
+    }
+
+  this->SetDefaultSequenceStorageNodeClassName(node->GetDefaultSequenceStorageNodeClassName());
+}
+
+//----------------------------------------------------------------------------
 void vtkMRMLStorableNode::CopyContent(vtkMRMLNode* anode, bool deepCopy/*=true*/)
 {
   MRMLNodeModifyBlocker blocker(this);
@@ -247,6 +260,8 @@ void vtkMRMLStorableNode::CopyContent(vtkMRMLNode* anode, bool deepCopy/*=true*/
         }
       }
     }
+
+  this->SetDefaultSequenceStorageNodeClassName(node->GetDefaultSequenceStorageNodeClassName());
 }
 
 //----------------------------------------------------------------------------
@@ -323,11 +338,6 @@ void vtkMRMLStorableNode::UpdateScene(vtkMRMLScene *scene)
       {
       vtkErrorMacro("UpdateScene: error getting " << i << "th storage node, id = " << (this->GetNthStorageNodeID(i) == nullptr ? "null" : this->GetNthStorageNodeID(i)));
       }
-    }
-  if (!success)
-    {
-    scene->SetErrorCode(1);
-    scene->SetErrorMessage(errorMessages);
     }
 }
 
@@ -469,5 +479,24 @@ bool vtkMRMLStorableNode::AddDefaultStorageNode(const char* filename /* =nullptr
 //---------------------------------------------------------------------------
 vtkMRMLStorageNode* vtkMRMLStorableNode:: CreateDefaultSequenceStorageNode()
 {
-  return vtkMRMLSequenceStorageNode::New();
+  vtkObject* ret = nullptr;
+  if (this->GetScene())
+    {
+    ret = this->GetScene()->CreateNodeByClass(this->DefaultSequenceStorageNodeClassName.c_str());
+    }
+
+  vtkMRMLStorageNode* storageNode = vtkMRMLStorageNode::SafeDownCast(ret);
+  if (storageNode)
+    {
+    return storageNode;
+    }
+
+  if (ret)
+    {
+    // Specified class is not a valid sequence storage node
+    ret->Delete();
+    }
+
+  // No valid sequence storage node
+  return nullptr;
 }

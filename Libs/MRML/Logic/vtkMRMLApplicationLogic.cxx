@@ -432,6 +432,7 @@ void vtkMRMLApplicationLogic::SetInteractionNode(vtkMRMLInteractionNode* interac
 
   vtkNew<vtkIntArray> events;
   events->InsertNextValue(vtkMRMLInteractionNode::EditNodeEvent);
+  events->InsertNextValue(vtkMRMLInteractionNode::ShowViewContextMenuEvent);
   vtkSetAndObserveMRMLNodeEventsMacro(this->Internal->InteractionNode, interactionNode, events);
 }
 
@@ -513,7 +514,7 @@ void vtkMRMLApplicationLogic::PropagatePlotChartSelection()
 }
 
 //----------------------------------------------------------------------------
-void vtkMRMLApplicationLogic::FitSliceToAll(bool onlyIfPropagateVolumeSelectionAllowed /* =false */)
+void vtkMRMLApplicationLogic::FitSliceToAll(bool onlyIfPropagateVolumeSelectionAllowed /* =false */, bool resetOrientation /* =true */)
 {
   if (this->Internal->SliceLogics.GetPointer() == nullptr)
     {
@@ -535,10 +536,13 @@ void vtkMRMLApplicationLogic::FitSliceToAll(bool onlyIfPropagateVolumeSelectionA
         }
       }
     vtkMRMLSliceNode* sliceNode = sliceLogic->GetSliceNode();
-    // Set to default orientation before rotation so that the view is snapped
-    // closest to the default orientation of this slice view.
-    sliceNode->SetOrientationToDefault();
-    sliceLogic->RotateSliceToLowestVolumeAxes(false);
+    if (resetOrientation)
+      {
+      // Set to default orientation before rotation so that the view is snapped
+      // closest to the default orientation of this slice view.
+      sliceNode->SetOrientationToDefault();
+      sliceLogic->RotateSliceToLowestVolumeAxes(false);
+      }
     int* dims = sliceNode->GetDimensions();
     sliceLogic->FitSliceToAll(dims[0], dims[1]);
     sliceLogic->SnapSliceOffsetToIJK();
@@ -824,6 +828,10 @@ void vtkMRMLApplicationLogic::ProcessMRMLNodesEvents(vtkObject* caller, unsigned
       vtkMRMLNode* nodeToBeEdited = reinterpret_cast<vtkMRMLNode*>(callData);
       this->EditNode(nodeToBeEdited);
       }
+    }
+  else if (vtkMRMLInteractionNode::SafeDownCast(caller) && event == vtkMRMLInteractionNode::ShowViewContextMenuEvent)
+    {
+    this->InvokeEvent(ShowViewContextMenuEvent, callData);
     }
   else
     {

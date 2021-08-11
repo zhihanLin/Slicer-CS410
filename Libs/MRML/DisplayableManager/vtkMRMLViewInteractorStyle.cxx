@@ -81,7 +81,9 @@ void vtkMRMLViewInteractorStyle::OnChar()
     {
     return;
     }
-  this->Superclass::OnChar();
+  // Do not call this->Superclass::OnChar(), because char OnChar events perform various
+  // low-level operations on the actors (change their rendering style to wireframe, pick them,
+  // change rendering mode to stereo, etc.), which would interfere with displayable managers.
 }
 
 //----------------------------------------------------------------------------
@@ -310,6 +312,7 @@ bool vtkMRMLViewInteractorStyle::DelegateInteractionEventToDisplayableManagers(v
   ed->SetType(inputEventData ? inputEventData->GetType() : vtkCommand::NoEvent);
   int displayPositionCorrected[2] = { displayPositionInt[0] - pokedRenderer->GetOrigin()[0], displayPositionInt[1] - pokedRenderer->GetOrigin()[1] };
   ed->SetDisplayPosition(displayPositionCorrected);
+  ed->SetMouseMovedSinceButtonDown(this->MouseMovedSinceButtonDown);
   ed->SetAttributesFromInteractor(this->GetInteractor());
   vtkEventDataDevice3D* inputEventDataDevice3D = inputEventData->GetAsEventDataDevice3D();
   if (inputEventDataDevice3D)
@@ -452,23 +455,6 @@ void vtkMRMLViewInteractorStyle::CustomProcessEvents(vtkObject* object,
     {
     // Displayable managers did not processed it
     Superclass::ProcessEvents(object, event, clientdata, calldata);
-    }
-
-  // VTK does not provide click events, detect them here
-  if (!self->MouseMovedSinceButtonDown)
-    {
-    if (event == vtkCommand::LeftButtonReleaseEvent)
-      {
-      self->DelegateInteractionEventToDisplayableManagers(vtkMRMLInteractionEventData::LeftButtonClickEvent);
-      }
-    else if (event == vtkCommand::MiddleButtonReleaseEvent)
-      {
-      self->DelegateInteractionEventToDisplayableManagers(vtkMRMLInteractionEventData::MiddleButtonClickEvent);
-      }
-    else if (event == vtkCommand::RightButtonReleaseEvent)
-      {
-      self->DelegateInteractionEventToDisplayableManagers(vtkMRMLInteractionEventData::RightButtonClickEvent);
-      }
     }
 }
 

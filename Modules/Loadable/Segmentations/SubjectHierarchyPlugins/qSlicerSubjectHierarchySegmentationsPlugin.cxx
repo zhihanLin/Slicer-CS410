@@ -660,7 +660,7 @@ void qSlicerSubjectHierarchySegmentationsPlugin::onSegmentAdded(vtkObject* calle
     {
     return;
     }
-  if (segmentationNode->GetScene()->IsImporting())
+  if (segmentationNode->GetScene() && segmentationNode->GetScene()->IsImporting())
     {
     // During scene import SH may not exist yet (if the scene was created without automatic SH creation)
     return;
@@ -712,10 +712,19 @@ void qSlicerSubjectHierarchySegmentationsPlugin::onSegmentAdded(vtkObject* calle
 
   if (segmentShItemID == vtkMRMLSubjectHierarchyNode::INVALID_ITEM_ID)
     {
+    // Get position of segment under parent
+    int positionUnderParent = -1;
+    vtkSegmentation* segmentation = segmentationNode->GetSegmentation();
+    if (segmentation)
+      {
+      positionUnderParent = segmentation->GetSegmentIndex(segmentId);
+      }
+
     // Add the segment in subject hierarchy to allow individual handling (e.g. visibility)
     vtkIdType segmentShItemID = shNode->CreateHierarchyItem(
       segmentationShItemID, (segment->GetName() ? segment->GetName() : ""),
-      vtkMRMLSubjectHierarchyConstants::GetSubjectHierarchyVirtualBranchAttributeName());
+      vtkMRMLSubjectHierarchyConstants::GetSubjectHierarchyVirtualBranchAttributeName(),
+      positionUnderParent);
     shNode->SetItemAttribute(segmentShItemID, vtkMRMLSegmentationNode::GetSegmentIDAttributeName(), segmentId);
     // Set plugin for the new item (automatically selects the segment plugin based on confidence values)
     qSlicerSubjectHierarchyPluginHandler::instance()->findAndSetOwnerPluginForSubjectHierarchyItem(segmentShItemID);
@@ -795,9 +804,9 @@ void qSlicerSubjectHierarchySegmentationsPlugin::onSegmentModified(vtkObject* ca
     {
     return;
     }
-  if (segmentationNode->GetScene()->IsImporting())
+  if (segmentationNode->GetScene() && segmentationNode->GetScene()->IsImporting())
     {
-    // during scene import SH may not exist yet (if the scene was created without automatic SH creation)
+    // During scene import SH may not exist yet (if the scene was created without automatic SH creation)
     return;
     }
   vtkMRMLSubjectHierarchyNode* shNode = qSlicerSubjectHierarchyPluginHandler::instance()->subjectHierarchyNode();
@@ -1196,6 +1205,11 @@ void qSlicerSubjectHierarchySegmentationsPlugin::updateAllSegmentsFromMRML(vtkMR
   if (!segmentationNode)
     {
     qWarning() << Q_FUNC_INFO << ": invalid segmentation node";
+    return;
+    }
+  if (segmentationNode->GetScene() && segmentationNode->GetScene()->IsImporting())
+    {
+    // During scene import SH may not exist yet (if the scene was created without automatic SH creation)
     return;
     }
   vtkMRMLSubjectHierarchyNode* shNode = qSlicerSubjectHierarchyPluginHandler::instance()->subjectHierarchyNode();

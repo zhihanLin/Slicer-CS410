@@ -423,6 +423,16 @@ void qSlicerCoreApplicationPrivate::init()
   model->setSlicerRequirements(q->revision(), q->os(), q->arch());
   q->setExtensionsManagerModel(model);
 
+  // Clear extension server settings with requested serverAPI changed
+  QSettings extensionsSettings(model->extensionsSettingsFilePath(), QSettings::IniFormat);
+  QString savedServerAPI = extensionsSettings.value("Extensions/ServerAPI").toString();
+  if (savedServerAPI != model->serverAPI())
+    {
+    extensionsSettings.remove("Extensions/ServerUrl");
+    extensionsSettings.remove("Extensions/FrontendServerUrl");
+    }
+  extensionsSettings.setValue("Extensions/ServerAPI", model->serverAPI());
+
 # ifdef Q_OS_MAC
   this->createDirectory(this->defaultExtensionsInstallPathForMacOSX(), "extensions"); // Make sure the path exists
   q->addLibraryPath(this->defaultExtensionsInstallPathForMacOSX());
@@ -446,6 +456,11 @@ void qSlicerCoreApplicationPrivate::init()
     {
     qDebug() << "Successfully uninstalled extension" << extensionName;
     }
+
+  // Set the list of installed extensions in the scene so that we can warn the user
+  // if the scene is loaded with some of the extensions not present.
+  QString extensionList = model->installedExtensions().join(";");
+  scene->SetExtensions(extensionList.toStdString().c_str());
 
 #endif
 
@@ -951,6 +966,7 @@ void qSlicerCoreApplication::handleCommandLineArguments()
 {
   qSlicerCoreCommandOptions* options = this->coreCommandOptions();
 
+  QStringList filesToLoad;
   QStringList unparsedArguments = options->unparsedArguments();
   if (unparsedArguments.length() > 0 &&
       options->pythonScript().isEmpty() &&
@@ -970,19 +986,19 @@ void qSlicerCoreApplication::handleCommandLineArguments()
       if (file.exists())
         {
         qDebug() << "Local filepath received via command-line: " << fileName;
-        qSlicerCoreIOManager* ioManager =this->coreIOManager();
-        qSlicerIO::IOFileType fileType = ioManager->fileType(fileName);
-        qSlicerIO::IOProperties fileProperties;
-        // It is important to use absolute file path, as in the scene relative path
-        // always relative to the .mrml scene file (while the user specified the path
-        // relative to the current working directory)
-        fileProperties.insert("fileName", file.absoluteFilePath());
-        ioManager->loadNodes(fileType, fileProperties);
+        // Do not load immediately but just collect the files into a list and load at once
+        // so that all potential loading errors can be also reported at once.
+        filesToLoad << fileName;
         continue;
         }
 
       qDebug() << "Ignore argument received via command-line (not a valid URL or existing local file): " << fileName;
       }
+    }
+
+  if (!filesToLoad.isEmpty())
+    {
+    this->loadFiles(filesToLoad);
     }
 
 #ifndef Slicer_USE_PYTHONQT
@@ -2128,4 +2144,26 @@ QString qSlicerCoreApplication::moduleDocumentationUrl(const QString& moduleName
     }
 
   return url;
+}
+
+//------------------------------------------------------------------------------
+bool qSlicerCoreApplication::loadFiles(const QStringList& filePaths, vtkMRMLMessageCollection* userMessages/*=nullptr*/)
+{
+  bool success = true;
+  foreach(QString filePath, filePaths)
+    {
+    QFileInfo file(filePath);
+    qSlicerCoreIOManager* ioManager = this->coreIOManager();
+    qSlicerIO::IOFileType fileType = ioManager->fileType(filePath);
+    qSlicerIO::IOProperties fileProperties;
+    // It is important to use absolute file path, as in the scene relative path
+    // always relative to the .mrml scene file (while the user specified the path
+    // relative to the current working directory)
+    fileProperties.insert("fileName", file.absoluteFilePath());
+    if (!ioManager->loadNodes(fileType, fileProperties, nullptr, userMessages))
+      {
+      success = false;
+      }
+    }
+  return success;
 }

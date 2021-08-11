@@ -332,6 +332,7 @@ class DICOMImageSequencePluginClass(DICOMPlugin):
 
     if loadable.singleSequence:
       outputSequenceNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLSequenceNode")
+      outputSequenceNode.SetName(loadable.name)
       outputSequenceNode.SetIndexName("instance number")
       outputSequenceNode.SetIndexUnit("")
       playbackRateFps = 10
@@ -352,6 +353,12 @@ class DICOMImageSequencePluginClass(DICOMPlugin):
         tempFrameVolume.SetIJKToRASMatrix(ijkToRas)
         tempFrameVolume.SetAndObserveImageData(imageData)
         instanceNumber = loadable.instanceNumbers[fileIndex]
+        # Save DICOM SOP instance UID into the sequence so DICOM metadata can be retrieved later if needed
+        tempFrameVolume.SetAttribute('DICOM.instanceUIDs', slicer.dicomDatabase.instanceForFile(filePath))
+        # Save trigger time, because it may be needed for 4D cine-MRI volume reconstruction
+        triggerTime = slicer.dicomDatabase.fileValue(filePath, self.tags['triggerTime'])
+        if triggerTime:
+          tempFrameVolume.SetAttribute('DICOM.triggerTime', triggerTime)
         outputSequenceNode.SetDataNodeAtValue(tempFrameVolume, str(instanceNumber))
       else:
         # each file is a new sequence

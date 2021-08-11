@@ -47,6 +47,7 @@ class Q_SLICER_BASE_QTGUI_EXPORT qSlicerWebWidget
   Q_OBJECT
   Q_PROPERTY(bool handleExternalUrlWithDesktopService READ handleExternalUrlWithDesktopService WRITE setHandleExternalUrlWithDesktopService)
   Q_PROPERTY(QStringList internalHosts READ internalHosts WRITE setInternalHosts)
+  Q_PROPERTY(bool javaScriptConsoleMessageLoggingEnabled READ javaScriptConsoleMessageLoggingEnabled WRITE setJavaScriptConsoleMessageLoggingEnabled)
   Q_PROPERTY(QString url READ url WRITE setUrl)
   friend class qSlicerWebEnginePage;
 public:
@@ -76,6 +77,15 @@ public:
   QStringList internalHosts() const;
   void setInternalHosts(const QStringList& hosts);
 
+  /// \brief Return true if javascript console messages should be logged.
+  ///
+  /// Default value initialized based on the "Developer/DeveloperMode" setting.
+  ///
+  /// \sa setJavaScriptConsoleMessageLoggingEnabled(bool)
+  /// \sa QWebEnginePage::javaScriptConsoleMessage
+  bool javaScriptConsoleMessageLoggingEnabled() const;
+  void setJavaScriptConsoleMessageLoggingEnabled(bool enable);
+
 //  QWebEngineProfile* profile()const;
 //  void setProfile(QWebEngineProfile* profile);
 
@@ -103,6 +113,7 @@ public slots:
 
   void onDownloadFinished(QNetworkReply* reply);
 
+  ///@{
   /// Renders the current content of the page into a PDF document and saves it in the location specified in filePath.
   ///
   /// The page size and orientation of the produced PDF document are taken from the values specified in pageLayout.
@@ -112,9 +123,11 @@ public slots:
   /// If a file already exists at the provided file path, it will be overwritten.
   /// \sa QWebEnginePage::printToPdf
   void printToPdf(const QString& filePath);
+  void printToPdf(const QString& filePath, const QPageLayout& pageLayout);
+  ///@}
 
 signals:
-  /// emited with result of evalJS
+  /// emitted with result of evalJS
   void evalResult(QString js, QString result);
 
   /// signal passed through from QWebEngineView
