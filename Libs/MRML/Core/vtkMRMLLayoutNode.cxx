@@ -8,6 +8,7 @@
 
 // MRML includes
 #include "vtkMRMLLayoutNode.h"
+#include "vtkMRMLAbstractViewNode.h"
 
 //----------------------------------------------------------------------------
 vtkMRMLNodeNewMacro(vtkMRMLLayoutNode);
@@ -175,6 +176,14 @@ void vtkMRMLLayoutNode::ReadXMLAttributes(const char** atts)
     }
 
   this->EndModify(disabledModify);
+}
+
+//----------------------------------------------------------------------------
+void vtkMRMLLayoutNode::Reset(vtkMRMLNode* defaultNode)
+{
+  MRMLNodeModifyBlocker blocker(this);
+  Superclass::Reset(defaultNode);
+  this->SetMaximizedViewNode(nullptr);
 }
 
 //----------------------------------------------------------------------------
@@ -373,4 +382,16 @@ void vtkMRMLLayoutNode::PrintSelf(ostream& os, vtkIndent indent)
     {
     os << indent << "Selected module: (none)\n";
     }
+}
+
+//----------------------------------------------------------------------------
+vtkMRMLAbstractViewNode* vtkMRMLLayoutNode::GetMaximizedViewNode()
+{
+  return vtkMRMLAbstractViewNode::SafeDownCast(this->GetNodeReference("MaximizedView"));
+}
+
+//----------------------------------------------------------------------------
+void vtkMRMLLayoutNode::SetMaximizedViewNode(vtkMRMLAbstractViewNode* maximizedViewNode)
+{
+  this->SetNodeReferenceID("MaximizedView", maximizedViewNode ? maximizedViewNode->GetID() : nullptr);
 }
