@@ -5,19 +5,22 @@
 Creates a fairly simple but pretty powerful web server that can respond to http(s) requests with data from the current Slicer or modify the Slicer state.  This module is meant to be the basis for implemeting web applications that use Slicer as a remote render / computation engine or for controlling your Slicer instance for interaction with other system code like shell scripts or other applications.
 
 There are three basic types of endpoints:
-- **Static:** Hosts files out of the module's `docroot` like any standard http server.  Currently this is used just for examples.
 - **Slicer:** Give read/write access to features in Slicer's mrml scene and gui.  This api also exposes the python interpreter so that arbitrary python code can be executed in the Slicer application (the user is prompted to approve this endpoint before code is accepted).
 - **DICOMweb:** Exposes the Slicer dicomDatabase as a [DICOMweb endpoint](https://www.dicomstandard.org/dicomweb).  This is somewhat limited, but enough to host a web app such as the [OHIF Viewer](https://ohif.org/).
+- **Static:** Hosts files out of the module's `docroot` like any standard http server.  Currently this is used just for examples.
 
 The web server is integrated with the Qt event loop so it can be used together with the interactive session.
 
 This code has been developed over a number of years in a separate repository where there are additional experiments demontrating other potential uses.  The version in Slicer core has been stripped down to address the most common expected use cases.  See [https://github.com/pieper/SlicerWeb](https://github.com/pieper/SlicerWeb).
 
-Also note that the code should be considered somewhat experimental and a likely security risk.  Do not expose web server endpoints on the public internet without careful consideration.
+Also note that the code should be considered somewhat experimental and a likely security risk.  Do not expose web server endpoints on the public internet without careful consideration.  Web server endpoints are disabled by default.
+
+Because the web server uses standard http, there are many off-the-shelf security options, such as firewalls, ssh-tunneling, and authenticating proxies, that can be used to improve security of installations.
+
 
 ## Current Features
 
-The server launches on port 2016 by default when you enter the module.  Access logs are shown in the GUI by default and can be routed to the console if persistence is needed (the GUI logs are cleared periodically).  If port 2016is in use, other ports are checked sequentially until an open port is found, allowing more than one Slicer web server to run concurrently.
+The server launches on port 2016 by default when you enter the module.  Access logs are shown in the GUI by default and can be routed to the console if persistence is needed (the GUI logs are cleared periodically).  If port 2016 is in use, other ports are checked sequentially until an open port is found, allowing more than one Slicer web server to run concurrently.
 
 Buttons in the module can launch either a desktop browser tab or a `qSlicerWebWidget` pointing to the server's demo page.
 
@@ -57,7 +60,7 @@ Currently there is only the logging console and the demo buttons.  Further contr
 
 ## Related modules
 
-- The [OpenIGTLink](https://github.com/openigtlink/SlicerOpenIGTLink) Extension has some similar functionality cusomized for image guided therapy applications.  It should be preferred for integration with imaging devices and use in a clinical setting.
+- The [OpenIGTLink](https://github.com/openigtlink/SlicerOpenIGTLink) Extension has some similar functionality customized for image guided therapy applications.  It should be preferred for integration with imaging devices and use in a clinical setting or for continuous high-throughput image and transform streams.
 
 ## Contributors
 

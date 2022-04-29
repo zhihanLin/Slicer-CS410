@@ -48,6 +48,50 @@ This work was partially funded by NIH grant 3P41RR013218.
 """
     self.parent = parent
 
+    # singleton logic to hold the module's webserver
+    # - this is the one created at startup of the setting key WebServer/RunServerAtStart is true
+    # - this is the one manipulated by Widget GUI
+    self.logic = None
+    self.logFilePath = ""
+
+    self.postModuleDiscoveryTasksPerformed = False
+
+  def setup(self):
+    # Tasks to execute after the application has started up
+    slicer.app.connect("startupCompleted()", self.performPostModuleDiscoveryTasks)
+
+  def performPostModuleDiscoveryTasks(self):
+    """ Start the server on application startup if enabled in settings
+    """
+
+    if self.postModuleDiscoveryTasksPerformed:
+      return
+
+    self.postModuleDiscoveryTasksPerformed = True
+
+    settings = qt.QSettings()
+    if settings.contains('WebServer/RunServerAtStart') and not slicer.app.commandOptions().testingEnabled:
+      if settings.value('WebServer/RunServerAtStart') == 'true':
+        self.startServer()
+
+  def startServer(self):
+    settings = qt.QSettings()
+    if settings.contains('WebServer/LogFilePath'):
+      self.logFilePath = settings.value('WebServer/LogFilePath')
+    self.logic = WebServerLogic(logMessage=self.logMessage)
+    self.logic.start()
+
+  def stopServer(self):
+    if self.logic:
+      self.logic.stop()
+    self.logic = None
+
+  def logMessage(self, *args):
+    if self.logFilePath != "":
+      with open(self.logFilePath, "a") as fp:
+        for arg in args:
+          fp.write(arg)
+
 
 #
 # WebServer widget
@@ -70,30 +114,51 @@ class WebServerWidget(ScriptedLoadableModuleWidget):
     pass
 
   def setLogging(self):
-    self.consoleMessages = self.logToConsole.checked
     self.guiMessages = self.logToGUI.checked
 
   def setup(self):
     ScriptedLoadableModuleWidget.setup(self)
 
-    # reload button
-    self.reloadButton = qt.QPushButton("Reload")
-    self.reloadButton.name = "WebServer Reload"
-    self.reloadButton.toolTip = "Reload this module."
-    self.layout.addWidget(self.reloadButton)
-    self.reloadButton.connect('clicked(bool)', self.onReload)
+    settings = qt.QSettings()
 
+    # reload button
+    if self.developerMode:
+      self.reloadButton = qt.QPushButton("Reload and Restart")
+      self.reloadButton.name = "WebServer Reload"
+      self.reloadButton.toolTip = "Reload this module."
+      self.layout.addWidget(self.reloadButton)
+      self.reloadButton.connect('clicked(bool)', self.onReload)
+
+    # set docroot
+    self.docrootButton = ctk.ctkDirectoryButton()
+    self.layout.addWidget(self.docrootButton)
+
+    # log file path
+    self.logFileHBox = qt.QHBoxLayout()
+    self.logFileLabel = qt.QLabel("Log file:")
+    self.logFileHBox.addWidget(self.logFileLabel)
+    self.logFilePath = ctk.ctkPathLineEdit()
+    if settings.contains('WebServer/LogFilePath'):
+      self.logFilePath.currentPath = settings.value('WebServer/LogFilePath')
+    else:
+      self.logFilePath.currentPath = ""
+    self.logFilePath.toolTip = "Path to save serverlogs"
+    self.logFileHBox.addWidget(self.logFilePath)
+    self.logFilePath.connect('currentPathchanged(const QString&)', self.onLogFilePathChanged)
+    self.layout.addWidget(self.logFileHBox)
+
+    # enable server
+    self.enableServer = qt.QCheckBox('Enable server')
+    self.enableServer.setChecked(settings.value("WebServer/RunServerAtStart"))
+    self.enableServer.toolTip = "Enable server (start it now and have it start again whenever Slicer runs)"
+    self.layout.addWidget(self.enableServer)
+    self.enableServer.connect('clicked()', self.onEnableServer)
+
+    # GUI Logging area
     self.log = qt.QTextEdit()
     self.log.readOnly = True
     self.layout.addWidget(self.log)
     self.logMessage('<p>Status: <i>Idle</i>\n')
-
-    # log to console
-    self.logToConsole = qt.QCheckBox('Log to Console')
-    self.logToConsole.setChecked(self.consoleMessages)
-    self.logToConsole.toolTip = "Copy log messages to the python console and parent terminal"
-    self.layout.addWidget(self.logToConsole)
-    self.logToConsole.connect('clicked()', self.setLogging)
 
     # log to GUI
     self.logToGUI = qt.QCheckBox('Log to GUI')
@@ -127,11 +192,23 @@ class WebServerWidget(ScriptedLoadableModuleWidget):
     self.layout.addWidget(self.localQtConnectionButton)
     self.localQtConnectionButton.connect('clicked()', lambda : self.openQtLocalConnection())
 
-    self.logic = WebServerLogic(logMessage=self.logMessage)
-    self.logic.start()
-
     # Add spacer to layout
     self.layout.addStretch(1)
+
+  def onEnableServer(self):
+    settings = qt.QSettings()
+    if self.enableServer.checked:
+      slicer.modules.WebServerInstance.stopServer()
+      settings.setValue('WebServer/RunServerAtStart', 'true')
+      slicer.modules.WebServerInstance.startServer()
+    else:
+      settings.setValue('WebServer/RunServerAtStart', 'false')
+      slicer.modules.WebServerInstance.stopServer()
+
+  def onLogFilePathChanged(self, logFilePath):
+    settings = qt.QSettings()
+    slicer.modules.WebServerInstance.logFilePath = logFilePath
+    settings.setValue('WebServer/LogFilePath', logFilePath)
 
   def openLocalConnection(self):
     qt.QDesktopServices.openUrl(qt.QUrl(f'http://localhost:{self.logic.port}'))
@@ -142,9 +219,9 @@ class WebServerWidget(ScriptedLoadableModuleWidget):
     self.webWidget.show()
 
   def onReload(self):
-    self.logic.stop()
+    slicer.modules.WebServerInstance.stopServer()
     ScriptedLoadableModuleWidget.onReload(self)
-    slicer.modules.WebServerWidget.logic.start()
+    slicer.modules.WebServerInstance.startServer()
 
   def logMessage(self,*args):
     if self.consoleMessages:
@@ -397,6 +474,8 @@ class SlicerRequestHandler(object):
     responseBody = None
     contentType = b'text/plain'
     try:
+      if request.find(b'/exec') == 0:
+        responseBody = self.exec(request, requestBody)
       if request.find(b'/repl') == 0:
         responseBody = self.repl(request, requestBody)
       elif request.find(b'/timeimage') == 0:
@@ -453,13 +532,20 @@ class SlicerRequestHandler(object):
 
   def repl(self,request, requestBody):
     """
+    Deprecated.  Use exec instead.
+    """
+    self.logMessage("repl is deprecated, use exec instead.")
+    return self.exec(request, requestBody)
+
+  def exec(self,request, requestBody):
+    """
     Implements the Read Eval Print Loop for python code.
     :param source: python code to run
     :return: result of code running
     example:
-curl -X POST localhost:2016/slicer/repl --data "slicer.app.layoutManager().setLayout(slicer.vtkMRMLLayoutNode.SlicerLayoutOneUpRedSliceView)"
+curl -X POST localhost:2016/slicer/exec --data "slicer.app.layoutManager().setLayout(slicer.vtkMRMLLayoutNode.SlicerLayoutOneUpRedSliceView)"
     """
-    self.logMessage('repl with body %s' % requestBody)
+    self.logMessage('exec with body %s' % requestBody)
     p = urlparse.urlparse(request.decode())
     q = urlparse.parse_qs(p.query)
     if requestBody:
@@ -1438,10 +1524,16 @@ class SlicerHTTPServer(HTTPServer):
       self.stop()
 
   def stop(self):
-    self.socket.close()
+    if self.socket:
+      self.socket.close()
     if self.notifier:
       self.notifier.disconnect('activated(int)', self.onServerSocketNotify)
     self.notifier = None
+
+  def running(self):
+    """ Returns true if the server is running
+    """
+    return self.notifier != None
 
   def handle_error(self, request, client_address):
     """Handle an error gracefully.  May be overridden.
